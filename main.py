@@ -3,65 +3,26 @@ import torch.nn as nn
 import torch.optim as optim
 import numpy as np
 import matplotlib.pyplot as plt
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
+from spectrum import *
+from autoencoder import *
+from dataset import *
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
 
-class Autoencoder(nn.Module):
-    def __init__(self, input_dim, hidden_dim=64, latent_dim=32):
-        super(Autoencoder, self).__init__()
-        
-        self.encoder = nn.Sequential(
-            nn.Linear(input_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Linear(hidden_dim, latent_dim),
-            nn.ReLU()
-        )
-
-        self.decoder = nn.Sequential(
-            nn.Linear(latent_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Linear(hidden_dim, input_dim)
-        )
-
-    def encode(self, x):
-        return self.encoder(x)
-    
-    def decode(self, x):
-        return self.decoder(x)
-
-    def forward(self, x):
-        x = self.encoder(x)
-        x = self.decoder(x)
-        return x
-
-class PolynomialDataset(Dataset):
-    def __init__(self, n_samples=1000, degree=3, num_points=50):
-        self.n_samples = n_samples
-        self.degree = degree
-        self.num_points = num_points
-        self.x = np.linspace(-1, 1, num_points)
-
-    def __len__(self):
-        return self.n_samples
-
-    def __getitem__(self, idx):
-        coeffs = np.random.uniform(-1, 1, self.degree + 1)
-        y = np.polyval(coeffs, self.x)
-        return torch.tensor(y, dtype=torch.float32)
-
-num_points = 250
-latent_dim = 8
-batches = 1000000
+num_points = 128
+latent_dim = 32
+batches = 500000
 batch_size = 128
 
-dataset = PolynomialDataset(n_samples=batches, degree=32, num_points=num_points)
+#dataset = PolynomialDataset(n_samples=batches, degree=16, num_points=num_points)
+dataset = SpectrumDataset(n_samples=batches, num_points=num_points)
 data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
-autoencoder = Autoencoder(input_dim=num_points, latent_dim=latent_dim).to(device)
-optimizer = optim.Adam(autoencoder.parameters(), lr=5e-4)
+autoencoder = MLPAutoencoder(input_dim=num_points, latent_dim=latent_dim).to(device)
+optimizer = optim.Adam(autoencoder.parameters(), lr=3e-3)
 loss_fn = nn.MSELoss()
 
 progress_bar = tqdm(data_loader)
@@ -75,8 +36,12 @@ for batch, data in enumerate(progress_bar):
     
     if batch % 100 == 0:
         progress_bar.set_description(f"Batch {batch}, MSE: {loss.item():.6f}")
+        #plt.plot(data[0].cpu().numpy().flatten(), label='Ground Truth')
+        #plt.legend()
+        #plt.show()
 
-sample = dataset[0].unsqueeze(0).to(device)
+wavelength_range = np.arange(380, 780, 400 / num_points)
+sample = torch.tensor(read_spectrum("data/light/cie.stdillum.D6500.spd", wavelength_range), dtype=torch.float).unsqueeze(0).to(device)
 predicted = autoencoder(sample).detach().cpu().numpy().flatten()
 
 plt.plot(sample.cpu().numpy().flatten(), label='Ground Truth')
