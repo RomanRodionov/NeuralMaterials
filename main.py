@@ -6,8 +6,11 @@ import matplotlib.pyplot as plt
 from torch.utils.data import Dataset, DataLoader
 from tqdm.auto import tqdm
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f"Using device: {device}")
+
 class Autoencoder(nn.Module):
-    def __init__(self, input_dim, hidden_dim=32, latent_dim=32):
+    def __init__(self, input_dim, hidden_dim=64, latent_dim=32):
         super(Autoencoder, self).__init__()
         
         self.encoder = nn.Sequential(
@@ -49,19 +52,21 @@ class PolynomialDataset(Dataset):
         y = np.polyval(coeffs, self.x)
         return torch.tensor(y, dtype=torch.float32)
 
-num_points = 100
-latent_dim = 32
-batches = 10000
-batch_size = 32
+num_points = 250
+latent_dim = 8
+batches = 1000000
+batch_size = 128
 
-dataset = PolynomialDataset(n_samples=batches * batch_size, degree=32, num_points=num_points)
+dataset = PolynomialDataset(n_samples=batches, degree=32, num_points=num_points)
 data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
-autoencoder = Autoencoder(input_dim=num_points, latent_dim=latent_dim)
-optimizer = optim.Adam(autoencoder.parameters(), lr=0.01)
+autoencoder = Autoencoder(input_dim=num_points, latent_dim=latent_dim).to(device)
+optimizer = optim.Adam(autoencoder.parameters(), lr=5e-4)
 loss_fn = nn.MSELoss()
 
-for batch, data in enumerate(tqdm(data_loader)):
+progress_bar = tqdm(data_loader)
+for batch, data in enumerate(progress_bar):
+    data = data.to(device)
     optimizer.zero_grad()
     reconstructed = autoencoder(data)
     loss = loss_fn(reconstructed, data)
@@ -69,12 +74,12 @@ for batch, data in enumerate(tqdm(data_loader)):
     optimizer.step()
     
     if batch % 100 == 0:
-        tqdm.write(f"Batch {batch}, MSE: {loss.item():.6f}")
+        progress_bar.set_description(f"Batch {batch}, MSE: {loss.item():.6f}")
 
-sample = dataset[0].unsqueeze(0)
-predicted = autoencoder(sample).detach().numpy().flatten()
+sample = dataset[0].unsqueeze(0).to(device)
+predicted = autoencoder(sample).detach().cpu().numpy().flatten()
 
-plt.plot(sample.numpy().flatten(), label='Ground Truth')
+plt.plot(sample.cpu().numpy().flatten(), label='Ground Truth')
 plt.plot(predicted, label='Reconstructed', linestyle='dashed')
 plt.legend()
 plt.show()
