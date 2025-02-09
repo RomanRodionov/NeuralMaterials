@@ -15,14 +15,14 @@ print(f"Using device: {device}")
 num_points = 128
 latent_dim = 32
 batches = 500000
-batch_size = 128
+batch_size = 256
 
 #dataset = PolynomialDataset(n_samples=batches, degree=16, num_points=num_points)
 dataset = SpectrumDataset(n_samples=batches, num_points=num_points)
 data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
 autoencoder = MLPAutoencoder(input_dim=num_points, latent_dim=latent_dim).to(device)
-optimizer = optim.Adam(autoencoder.parameters(), lr=3e-3)
+optimizer = optim.Adam(autoencoder.parameters(), lr=5e-3)
 loss_fn = nn.MSELoss()
 
 progress_bar = tqdm(data_loader)
@@ -48,3 +48,4 @@ plt.plot(sample.cpu().numpy().flatten(), label='Ground Truth')
 plt.plot(predicted, label='Reconstructed', linestyle='dashed')
 plt.legend()
 plt.show()
+print(f"D6500 MSE: {loss_fn(sample, autoencoder(sample))}")

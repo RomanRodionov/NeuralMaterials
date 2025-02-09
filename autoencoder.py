@@ -12,16 +12,12 @@ class MLPAutoencoder(nn.Module):
         self.encoder = nn.Sequential(
             nn.Linear(input_dim, hidden_dim),
             Sin(),
-            nn.Linear(hidden_dim, hidden_dim),
-            Sin(),
             nn.Linear(hidden_dim, latent_dim),
             Sin()
         )
 
         self.decoder = nn.Sequential(
             nn.Linear(latent_dim, hidden_dim),
-            Sin(),
-            nn.Linear(hidden_dim, hidden_dim),
             Sin(),
             nn.Linear(hidden_dim, input_dim)
         )
