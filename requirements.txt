@@ -5,3 +5,4 @@ tqdm
 scipy
 torchvision
 datasets
+opencv-python

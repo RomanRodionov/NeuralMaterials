@@ -4,10 +4,11 @@ from scipy.stats import norm
 from torch.utils.data import Dataset
 
 class PolynomialDataset(Dataset):
-    def __init__(self, n_samples=1000, degree=3, num_points=50):
+    def __init__(self, n_samples=1000, degree=3, num_points=50, noise=True):
         self.n_samples = n_samples
         self.degree = degree
         self.num_points = num_points
+        self.noise = noise
         self.x = np.linspace(-1, 1, num_points)
 
     def __len__(self):
@@ -17,9 +18,9 @@ class PolynomialDataset(Dataset):
         coeffs = np.random.uniform(-1, 1, self.degree + 1)
         y = np.polyval(coeffs, self.x)
 
-        # noise
-        y += np.sin(self.x * np.random.uniform(1, 10)) * np.random.uniform(0.1, 0.5)
-        y += np.random.normal(0, 0.05, size=self.num_points)
+        if self.noise:
+            y += np.sin(self.x * np.random.uniform(1, 10)) * np.random.uniform(0.1, 0.5)
+            y += np.random.normal(0, 0.05, size=self.num_points)
 
         # random scaling
         y = (y - y.min()) / (y.max() - y.min())
