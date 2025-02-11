@@ -7,7 +7,7 @@ from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
 from spectrum import *
 from autoencoder import *
-from dataset import *
+from dataset.spectrum import *
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
@@ -41,7 +41,7 @@ for batch, data in enumerate(progress_bar):
         #plt.show()
 
 wavelength_range = np.arange(380, 780, 400 / num_points)
-sample = torch.tensor(read_spectrum("data/light/cie.stdillum.D6500.spd", wavelength_range), dtype=torch.float).unsqueeze(0).to(device)
+sample = torch.tensor(read_spectrum("resources/light/cie.stdillum.D6500.spd", wavelength_range), dtype=torch.float).unsqueeze(0).to(device)
 predicted = autoencoder(sample).detach().cpu().numpy().flatten()
 
 plt.plot(sample.cpu().numpy().flatten(), label='Ground Truth')
