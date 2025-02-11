@@ -42,14 +42,18 @@ class CNNAutoencoder(nn.Module):
             nn.ReLU(),
             nn.Conv1d(4, 8, kernel_size=5, stride=2, padding=2),
             nn.ReLU(),
+            nn.Conv1d(8, 16, kernel_size=5, stride=2, padding=2),
+            nn.ReLU(),
             nn.Flatten(),
-            nn.Linear((input_dim // 4) * 8, latent_dim)
+            nn.Linear((input_dim // 8) * 16, latent_dim)
         )
 
         self.decoder = nn.Sequential(
-            nn.Linear(latent_dim, (input_dim // 4) * 8),
+            nn.Linear(latent_dim, (input_dim // 8) * 16),
             nn.ReLU(),
-            nn.Unflatten(1, (8, input_dim // 4)),
+            nn.Unflatten(1, (16, input_dim // 8)),
+            nn.ConvTranspose1d(16, 8, kernel_size=5, stride=2, padding=2, output_padding=1),
+            nn.ReLU(),
             nn.ConvTranspose1d(8, 4, kernel_size=5, stride=2, padding=2, output_padding=1),
             nn.ReLU(),
             nn.ConvTranspose1d(4, 1, kernel_size=5, stride=2, padding=2, output_padding=1)

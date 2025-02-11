@@ -50,7 +50,7 @@ class SpectrumDataset(Dataset):
         wavelengths = np.linspace(min_wavelength, max_wavelength, self.num_points)
         max_n_peaks = 5
         min_power = 0.1
-        max_power = 1
+        max_power = 2
         power_range = max_power - min_power
         min_fwhm = 1
         max_fwhm = 100

@@ -14,14 +14,14 @@ print(f"Using device: {device}")
 
 num_points = 128
 latent_dim = 32
-batches = 500000
-batch_size = 256
+batches = 2500000
+batch_size = 512
 
 #dataset = PolynomialDataset(n_samples=batches, degree=16, num_points=num_points)
 dataset = SpectrumDataset(n_samples=batches, num_points=num_points)
-data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=20)
 
-autoencoder = MLPAutoencoder(input_dim=num_points, latent_dim=latent_dim).to(device)
+autoencoder = CNNAutoencoder(input_dim=num_points, latent_dim=latent_dim).to(device)
 optimizer = optim.Adam(autoencoder.parameters(), lr=5e-3)
 loss_fn = nn.MSELoss()
 
