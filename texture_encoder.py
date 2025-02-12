@@ -5,7 +5,7 @@ import torch.nn as nn
 
 # basic variant
 class TextureEncoder(nn.Module):
-    def __init__(self, input_dim, hidden_dim=64, latent_dim=32):
+    def __init__(self, input_dim, hidden_dim=64, latent_dim=8):
         super(TextureEncoder, self).__init__()
         
         self.encoder = nn.Sequential(
