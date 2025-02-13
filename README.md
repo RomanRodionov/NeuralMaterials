@@ -12,7 +12,7 @@ GT Phong:
 ![gt_phong](https://github.com/RomanRodionov/NeuralMaterials/blob/main/tests/phong/gt_2.png?raw=true)
 
 Neural Phong:
-![gt_phong](https://github.com/RomanRodionov/NeuralMaterials/blob/main/tests/phong/neural_2.png?raw=true)
+![neural_phong](https://github.com/RomanRodionov/NeuralMaterials/blob/main/tests/phong/neural_2.png?raw=true)
 
 Install:
 
