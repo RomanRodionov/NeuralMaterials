@@ -38,7 +38,7 @@ class SimpleDecoder(nn.Module):
             nn.Linear(6, 3)
         )
 
-    def forward(self, x, w_i, w_o):
-        z = torch.cat([x, w_i, w_o], dim=-1)
+    def forward(self, w_i, w_o):
+        z = torch.cat([w_i, w_o], dim=-1)
         z = self.decoder(z)
         return z

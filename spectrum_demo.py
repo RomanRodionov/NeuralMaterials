@@ -14,11 +14,11 @@ print(f"Using device: {device}")
 
 num_points = 128
 latent_dim = 32
-batches = 1000000
+samples = 1000000
 batch_size = 128
 
-#dataset = PolynomialDataset(n_samples=batches, degree=16, num_points=num_points)
-dataset = SpectrumDataset(n_samples=batches, num_points=num_points)
+#dataset = PolynomialDataset(n_samples=samples, degree=16, num_points=num_points)
+dataset = SpectrumDataset(n_samples=samples, num_points=num_points)
 data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=6)
 
 autoencoder = CNNAutoencoder(input_dim=num_points, latent_dim=latent_dim).to(device)

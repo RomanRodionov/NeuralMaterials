@@ -3,8 +3,9 @@ from torch.utils.data import Dataset
 import cv2
 import os
 import numpy as np
+from brdf_models import phong
 
-class MaterialDataset(Dataset):
+class TextureDataset(Dataset):
     texture_types = ["basecolor", "diffuse", "displacement", "height", "metallic", "normal", "opacity", "roughness", "specular"]
 
     def __init__(self, path, resolution=(1024, 1024), n_samples=1000):
@@ -36,11 +37,23 @@ class MaterialDataset(Dataset):
         u, v = np.random.randint(0, h), np.random.randint(0, w)
         sample = self.channels[u, v]
         return torch.tensor(sample, dtype=torch.float32)
+    
+class PhongDataset(Dataset):
+    def __init__(self, n_samples=1000):
+        self.n_samples = n_samples
+    
+    def __len__(self):
+        return self.n_samples
+    
+    def __getitem__(self, idx):
+        rnd = torch.randn(2, 3, dtype=torch.float32)
+        sample = rnd / torch.linalg.norm(rnd, dim=-1, keepdim=True)
+        return sample[0], sample[1], phong(sample[0], sample[1])
 
 if __name__ == "__main__":
     # just example
     path = "../resources/materials/test/Metal/tc_metal_029"
-    dataset = MaterialDataset(path)
+    dataset = TextureDataset(path)
     for i in range(5):
         sample = dataset[i]
         print(sample.shape, sample)
