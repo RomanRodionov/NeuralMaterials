@@ -6,3 +6,4 @@ scipy
 torchvision
 datasets
 opencv-python
+scikit-image

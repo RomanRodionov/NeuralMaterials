@@ -28,13 +28,13 @@ class SimpleDecoder(nn.Module):
         
         self.decoder = nn.Sequential(
             nn.Linear(6, hidden_dim),
-            nn.ReLU(),
+            nn.GELU(),
             nn.Linear(hidden_dim, hidden_dim),
-            nn.ReLU(),            
+            nn.GELU(),            
             nn.Linear(hidden_dim, hidden_dim),
-            nn.ReLU(),
+            nn.GELU(),
             nn.Linear(hidden_dim, 6),
-            nn.ReLU(),
+            nn.GELU(),
             nn.Linear(6, 3)
         )
 

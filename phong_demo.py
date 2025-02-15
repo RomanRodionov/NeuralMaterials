@@ -8,6 +8,7 @@ from tqdm.auto import tqdm
 from brdf_models import phong
 from dataset.materials import PhongDataset
 from brdf_decoder import SimpleDecoder
+from skimage.metrics import peak_signal_noise_ratio as base_psnr
 import cv2
 
 def train_decoder():
@@ -18,7 +19,7 @@ def train_decoder():
     batch_size = 128
 
     dataset = PhongDataset(n_samples=samples)
-    data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=6)
+    data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=10)
 
     decoder = SimpleDecoder().to(device)
     optimizer = optim.Adam(decoder.parameters(), lr=5e-3)
@@ -81,12 +82,12 @@ def phong_demo(view_dir=(0, 0, 1), size=128):
     return image
 
 if __name__ == "__main__":
-    cv2.imwrite('./tests/phong/gt_1.png', phong_demo((0, 0, 1)) * 255.0)
-    cv2.imwrite('./tests/phong/gt_2.png', phong_demo((0.5, 0, 0.5)) * 255.0)
-    cv2.imwrite('./tests/phong/gt_3.png', phong_demo((0, 0.5, 0.5)) * 255.0)
-
     decoder = train_decoder()
-    
-    cv2.imwrite('./tests/phong/neural_1_.png', neural_phong_demo(decoder, (0, 0, 1)) * 255.0)
-    cv2.imwrite('./tests/phong/neural_2_.png', neural_phong_demo(decoder, (0.5, 0, 0.5)) * 255.0)
-    cv2.imwrite('./tests/phong/neural_3_.png', neural_phong_demo(decoder, (0, 0.5, 0.5)) * 255.0)
+    views = [(0, 0, 1), (0.5, 0, 0.5), (0, 0.5, 0.5)]
+
+    for i, view in enumerate(views):
+        gt = phong_demo(view)
+        cv2.imwrite(f'./tests/phong/gt_{i + 1}.png', gt * 255.0)
+        img = neural_phong_demo(decoder, view)
+        cv2.imwrite(f'./tests/phong/neural_{i + 1}.png', img * 255.0)
+        print("PSNR: ", base_psnr(gt, img))
