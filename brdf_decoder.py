@@ -23,7 +23,7 @@ class TextureDecoder(nn.Module):
         return z
 
 class SimpleDecoder(nn.Module):
-    def __init__(self, hidden_dim=64):
+    def __init__(self, hidden_dim=64, output_dim=6):
         super(SimpleDecoder, self).__init__()
         
         self.decoder = nn.Sequential(
@@ -36,6 +36,27 @@ class SimpleDecoder(nn.Module):
             nn.Linear(hidden_dim, 6),
             nn.GELU(),
             nn.Linear(6, 3)
+        )
+
+    def forward(self, w_i, w_o):
+        z = torch.cat([w_i, w_o], dim=-1)
+        z = self.decoder(z)
+        return z
+    
+class MomentsDecoder(nn.Module):
+    def __init__(self, hidden_dim=64, output_dim=6):
+        super(MomentsDecoder, self).__init__()
+        
+        self.decoder = nn.Sequential(
+            nn.Linear(6, hidden_dim),
+            nn.GELU(),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.GELU(),            
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.GELU(),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.GELU(),
+            nn.Linear(hidden_dim, output_dim)
         )
 
     def forward(self, w_i, w_o):

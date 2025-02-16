@@ -15,7 +15,7 @@ def train_decoder():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
-    samples = 1000000
+    samples = 500000
     batch_size = 128
 
     dataset = PhongDataset(n_samples=samples)
