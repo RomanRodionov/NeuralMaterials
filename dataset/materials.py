@@ -4,6 +4,8 @@ import cv2
 import os
 import numpy as np
 from brdf_models import phong
+from graphics_utils import film_refl
+from utils.sampling import *
 
 class TextureDataset(Dataset):
     texture_types = ["basecolor", "diffuse", "displacement", "height", "metallic", "normal", "opacity", "roughness", "specular"]
@@ -49,6 +51,28 @@ class PhongDataset(Dataset):
         rnd = torch.randn(2, 3, dtype=torch.float32)
         sample = rnd / torch.linalg.norm(rnd, dim=-1, keepdim=True)
         return sample[0], sample[1], phong(sample[0], sample[1])
+
+class IridescenceDataset(Dataset):
+    def __init__(self, min_wavelength=380, max_wavelength=780, film_thickness=300, n_samples=1000):
+        self.min_wavelength = min_wavelength
+        self.max_wavelength = max_wavelength
+        self.range = max_wavelength - min_wavelength
+        self.film_thickness = film_thickness
+        self.n_samples = n_samples
+    
+    def __len__(self):
+        return self.n_samples
+    
+    def __getitem__(self, idx):
+        samples = sample_hemisphere(2)
+        wavelength = np.random.rand() * self.range + self.min_wavelength
+        value = film_refl(samples[0], samples[1], self.film_thickness, wavelength)
+
+        samples    = torch.tensor(samples, dtype=torch.float32)
+        wavelength = torch.tensor(wavelength, dtype=torch.float32)
+        value      = torch.tensor(value, dtype=torch.float32)
+
+        return samples[0], samples[1], wavelength, value
 
 if __name__ == "__main__":
     # just example
