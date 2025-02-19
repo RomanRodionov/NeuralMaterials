@@ -6,6 +6,7 @@ import numpy as np
 from brdf_models import phong
 from graphics_utils import film_refl
 from utils.sampling import *
+from external.compact_spectra import *
 
 class TextureDataset(Dataset):
     texture_types = ["basecolor", "diffuse", "displacement", "height", "metallic", "normal", "opacity", "roughness", "specular"]
@@ -73,6 +74,52 @@ class IridescenceDataset(Dataset):
         value      = torch.tensor(value, dtype=torch.float32)
 
         return samples[0], samples[1], wavelength, value
+
+if __name__ == "__main__":
+    # just example
+    path = "../resources/materials/test/Metal/tc_metal_029"
+    dataset = TextureDataset(path)
+    for i in range(5):
+        sample = dataset[i]
+        print(sample.shape, sample)
+
+class MomentsDataset(Dataset):
+    def __init__(self, min_wavelength=380, max_wavelength=780, film_thickness=300, n_moments=6, n_points=100, n_samples=1000):
+        self.film_thickness = film_thickness
+        self.n_points = n_points
+        self.n_moments = n_moments
+        self.n_samples = n_samples
+        
+        self.mirror_signal=True
+        self.use_warp=True
+        self.use_lagrange=True
+    
+        self.wavelengths = np.linspace(min_wavelength, max_wavelength, n_points)
+        self.phases = WavelengthToPhase(self.wavelengths, self.wavelengths.min(), self.wavelengths.max(), self.mirror_signal, self.use_warp)
+    
+    def __len__(self):
+        return self.n_samples
+    
+    def moments_to_spectrum(self, bounded_moments):
+        if(self.use_lagrange):
+            bounded_mese = EvaluateBoundedMESELagrange(self.wavelengths, bounded_moments)
+        else:
+            bounded_mese = EvaluateBoundedMESEDirect(self.wavelengths, bounded_moments)
+        return bounded_mese
+    
+    def __getitem__(self, idx):
+        samples = sample_hemisphere(2)
+
+        reflectance = np.zeros(self.n_points)
+        for i, wavelength in enumerate(self.wavelengths):
+            reflectance[i] = film_refl(samples[0], samples[1], self.film_thickness, wavelength)
+
+        bounded_moments = ComputeTrigonometricMoments(self.phases,reflectance,self.n_moments,self.mirror_signal)
+
+        samples         = torch.tensor(samples, dtype=torch.float32)
+        bounded_moments = torch.tensor(bounded_moments, dtype=torch.float32)
+
+        return samples[0], samples[1], bounded_moments
 
 if __name__ == "__main__":
     # just example
