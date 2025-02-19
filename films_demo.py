@@ -14,13 +14,13 @@ def train_decoder():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
-    samples = 2500000
+    samples = 10000000
     batch_size = 1024
 
     dataset = IridescenceDataset(n_samples=samples)
-    data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=10)
+    data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=20)
 
-    decoder = SpectralDecoder(output_dim=1).to(device)
+    decoder = SpectralDecoder(hidden_dim=16, output_dim=1).to(device)
     initialize_weights(decoder, "normal")
     optimizer = optim.Adam(decoder.parameters(), lr=3e-3)
     loss_fn = nn.MSELoss()

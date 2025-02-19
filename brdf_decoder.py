@@ -45,28 +45,24 @@ class SimpleDecoder(nn.Module):
         return z
     
 class SpectralDecoder(nn.Module):
-    def __init__(self, hidden_dim=64, output_dim=1):
+    def __init__(self, hidden_dim=32, output_dim=1):
         super(SpectralDecoder, self).__init__()
 
         self.vectors_encoder = nn.Sequential(
             nn.Linear(6, hidden_dim // 2),
-            nn.GELU()
+            nn.SiLU()
         )
 
         self.wavelength_encoder = nn.Sequential(
             nn.Linear(1, hidden_dim // 2),
-            nn.GELU()
+            nn.SiLU()
         )
         
         self.decoder = nn.Sequential(
             nn.Linear(hidden_dim, hidden_dim),
-            nn.GELU(),
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.GELU(),            
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.GELU(),
+            nn.SiLU(),
             nn.Linear(hidden_dim, 6),
-            nn.GELU(),
+            nn.SiLU(),
             nn.Linear(6, output_dim)
         )
 

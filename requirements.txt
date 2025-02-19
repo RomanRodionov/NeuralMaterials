@@ -7,5 +7,6 @@ torchvision
 datasets
 opencv-python
 scikit-image
+wheel
 pybind11
 ./graphics_utils
