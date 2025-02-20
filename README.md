@@ -4,23 +4,24 @@ This repository contains:
 - spectrum autoencoder
 - neural Phong illumination model
 - neural thin film reflection function
+- neural MESE prediction
 - nothing else
 
 Spectrum example:
 
 ![spectrum](https://github.com/RomanRodionov/NeuralMaterials/blob/main/spectrum_example.png?raw=true)
 
-GT Phong:
+GT Phong / Neural Phong:
 
-![gt_phong](https://github.com/RomanRodionov/NeuralMaterials/blob/main/tests/phong/gt_2.png?raw=true)
-
-Neural Phong:
-
-![neural_phong](https://github.com/RomanRodionov/NeuralMaterials/blob/main/tests/phong/neural_2.png?raw=true)
+![gt_phong](https://github.com/RomanRodionov/NeuralMaterials/blob/main/tests/phong/gt_2.png?raw=true) ![neural_phong](https://github.com/RomanRodionov/NeuralMaterials/blob/main/tests/phong/neural_2.png?raw=true)
 
 Thin films reflection example:
 
 ![films](https://github.com/RomanRodionov/NeuralMaterials/blob/main/films_example.png?raw=true)
+
+Thin films with MESE representation [original paper](https://momentsingraphics.de/Media/Siggraph2019/Peters2019-CompactSpectra.pdf):
+
+![mese_films](https://github.com/RomanRodionov/NeuralMaterials/blob/main/tests/mese/moments_15.png?raw=true)
 
 Install:
 
@@ -40,3 +41,7 @@ To run phong demo use:
 To run thin_films demo use:
 
     python3 films_demo.py
+
+To run MESE demo use:
+
+    python3 moments_demo.py

@@ -74,18 +74,16 @@ class SpectralDecoder(nn.Module):
         return z
     
 class MomentsDecoder(nn.Module):
-    def __init__(self, hidden_dim=64, output_dim=6):
+    def __init__(self, hidden_dim=16, output_dim=6):
         super(MomentsDecoder, self).__init__()
         
         self.decoder = nn.Sequential(
             nn.Linear(6, hidden_dim),
-            nn.GELU(),
+            nn.SiLU(),
             nn.Linear(hidden_dim, hidden_dim),
-            nn.GELU(),            
+            nn.SiLU(),
             nn.Linear(hidden_dim, hidden_dim),
-            nn.GELU(),
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.GELU(),
+            nn.SiLU(),
             nn.Linear(hidden_dim, output_dim)
         )
 
