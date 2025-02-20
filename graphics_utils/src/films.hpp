@@ -1,7 +1,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
 
-#include "../../3rd_party/LiteMath/LiteMath.h"
+#include "../../external/LiteMath/LiteMath.h"
 
 namespace py = pybind11;
 
