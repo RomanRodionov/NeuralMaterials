@@ -79,11 +79,11 @@ class MomentsDecoder(nn.Module):
         
         self.decoder = nn.Sequential(
             nn.Linear(6, hidden_dim),
-            nn.SiLU(),
+            nn.LeakyReLU(),
             nn.Linear(hidden_dim, hidden_dim),
-            nn.SiLU(),
+            nn.LeakyReLU(),
             nn.Linear(hidden_dim, hidden_dim),
-            nn.SiLU(),
+            nn.LeakyReLU(),
             nn.Linear(hidden_dim, output_dim)
         )
 

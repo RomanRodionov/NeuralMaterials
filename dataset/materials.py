@@ -83,7 +83,7 @@ class MomentsDataset(Dataset):
         self.n_samples = n_samples
         
         self.mirror_signal = True
-        self.use_warp      = True
+        self.use_warp      = False
         self.use_lagrange  = True
     
         self.wavelengths = np.linspace(min_wavelength, max_wavelength, n_points)

@@ -20,7 +20,8 @@ def train_decoder(dataset):
 
     decoder = MomentsDecoder(hidden_dim=16, output_dim=n_moments + 1).to(device)
     initialize_weights(decoder, "normal")
-    optimizer = optim.Adam(decoder.parameters(), lr=3e-3)
+    optimizer = optim.Adam(decoder.parameters(), lr=1e-2)
+    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=1000, gamma=0.1)
     loss_fn = nn.MSELoss()
 
     progress_bar = tqdm(data_loader)
@@ -34,14 +35,15 @@ def train_decoder(dataset):
         loss = loss_fn(value, labels)
         loss.backward()
         optimizer.step()
+        scheduler.step()
         
-        if batch % 100 == 0:
+        if batch % 10 == 0:
             progress_bar.set_description(f"Batch {batch}, MSE: {loss.item():.8f}")
     
     return decoder.to("cpu")
 
 if __name__ == "__main__":
-    dataset = MomentsDataset(n_samples=1000000, n_moments=15)
+    dataset = MomentsDataset(n_samples=150000, n_moments=15)
     decoder = train_decoder(dataset).cpu()
 
     num_points = dataset.n_points
@@ -65,8 +67,10 @@ if __name__ == "__main__":
                 torch.tensor(w_o, dtype=torch.float32)
             )
             predicted_map[i] = dataset.moments_to_spectrum(predicted.numpy())
+
         for j, wavelength in enumerate(wavelength_range):
             gt_map[i, j] = film_refl(w_i, w_o, thickness, wavelength)
+
         mese_map[i] = dataset.moments_to_spectrum(dataset.spectrum_to_moments(gt_map[i]))
 
     fig, axs = plt.subplots(1, 3, figsize=(18, 5))
