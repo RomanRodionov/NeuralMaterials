@@ -1,6 +1,53 @@
 import torch
 import torch.nn as nn
 import torch.nn.init as init
+import torch.nn.functional as F
+
+#https://research.nvidia.com/labs/rtr/neural_appearance_models/assets/nvidia_neural_materials_author_paper.pdf
+
+# simpled variant
+
+class LatentTexture(nn.Module):
+    def __init__(self, resolution=(128, 128), latent_dim=8):
+        super(LatentTexture, self).__init__()
+        
+        self.resolution = resolution
+        self.latent_dim = latent_dim
+        
+        self.latent_texture = nn.Parameter(torch.randn(1, latent_dim, *resolution))
+
+    def set(self, latent_texture):
+        assert latent_texture.shape == (self.latent_dim, *self.resolution)
+        self.latent_texture.data = latent_texture.unsqueeze(0)
+
+    def forward(self, uv):
+        N = uv.shape[0]
+        uv = uv * 2 - 1
+        uv = uv.view(1, 1, N, 2)
+
+        sampled_latents = F.grid_sample(self.latent_texture, uv, align_corners=True)
+        
+        return sampled_latents.view(N, self.latent_dim)
+
+class TextureEncoder(nn.Module):
+    def __init__(self, hidden_dim=64, latent_dim=8):
+        super(TextureEncoder, self).__init__()
+        
+        self.encoder = nn.Sequential(
+            nn.LazyLinear(hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU(),            
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, latent_dim)
+        )
+
+    def forward(self, x):
+        x = self.encoder(x)
+        return x
 
 class TextureDecoder(nn.Module):
     def __init__(self, latent_dim=8, hidden_dim=64):
@@ -15,7 +62,7 @@ class TextureDecoder(nn.Module):
             nn.ReLU(),
             nn.Linear(hidden_dim, 6),
             nn.ReLU(),
-            nn.Linear(6, 1)
+            nn.Linear(6, 3)
         )
 
     def forward(self, x, w_i, w_o):
@@ -91,7 +138,6 @@ class MomentsDecoder(nn.Module):
         z = torch.cat([w_i, w_o], dim=-1)
         z = self.decoder(z)
         return z
-
 
 
 def initialize_weights(model, init_type="xavier_uniform"):

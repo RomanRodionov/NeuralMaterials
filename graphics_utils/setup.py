@@ -7,6 +7,8 @@ ext_modules = [
         [
             "src/bindings.cpp",
             "src/films.cpp",
+            "src/principled.cpp",
+            "src/common.cpp"
         ],
         include_dirs=["include"],
     ),

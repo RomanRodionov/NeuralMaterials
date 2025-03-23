@@ -4,12 +4,13 @@ import cv2
 import os
 import numpy as np
 from brdf_models import phong
-from graphics_utils import film_refl
+from graphics_utils import film_refl, principled_bsdf
 from utils.sampling import *
 from external.compact_spectra import *
 
 class TextureDataset(Dataset):
-    texture_types = ["basecolor", "diffuse", "displacement", "height", "metallic", "normal", "opacity", "roughness", "specular"]
+    #texture_types = ["basecolor", "diffuse", "displacement", "height", "metallic", "normal", "opacity", "roughness", "specular"]
+    texture_types = ["basecolor", "metallic", "roughness", "specular"]
 
     def __init__(self, path, resolution=(1024, 1024), n_samples=1000):
         self.n_samples = n_samples
@@ -36,10 +37,66 @@ class TextureDataset(Dataset):
         return self.n_samples
     
     def __getitem__(self, idx):
-        h, w, _ = self.textures[self.texture_types[0]].shape
-        u, v = np.random.randint(0, h), np.random.randint(0, w)
-        sample = self.channels[u, v]
-        return torch.tensor(sample, dtype=torch.float32)
+        u, v = np.random.rand(), np.random.rand()
+        return self.sample(u, v)
+    
+    def sample(self, u, v):
+        h, w = self.resolution
+
+        i = u * (h - 1)
+        j = v * (w - 1)
+
+        i0, j0 = int(np.floor(i)), int(np.floor(j))
+        i1, j1 = min(i0 + 1, h - 1), min(j0 + 1, w - 1)
+
+        di, dj = i - i0, j - j0
+
+        def interpolate(tex_array):
+            return (
+                (1 - di) * (1 - dj) * tex_array[i0, j0] +
+                (1 - di) * dj * tex_array[i0, j1] +
+                di * (1 - dj) * tex_array[i1, j0] +
+                di * dj * tex_array[i1, j1]
+            )
+
+        vec_params = torch.tensor(interpolate(self.channels), dtype=torch.float32)
+        dict_params = {tex: torch.tensor(interpolate(self.textures[tex]), dtype=torch.float32) for tex in self.texture_types}
+
+        return vec_params, dict_params
+    
+class PrincipledDataset(Dataset):
+    def __init__(self, textures, n_samples=1000):
+        self.n_samples = n_samples
+        self.textures = textures
+
+    def __len__(self):
+        return self.n_samples
+    
+    def __getitem__(self, idx):
+        vec_params, dict_params = self.textures[idx]        
+        
+        samples = sample_hemisphere(2)
+        normal = np.array((0, 0, 1))
+
+        gt_bsdf = principled_bsdf(samples[0], samples[1], normal, dict_params["basecolor"], dict_params["metallic"], dict_params["roughness"], dict_params["specular"])
+        
+        samples    = torch.tensor(samples, dtype=torch.float32)
+        gt_bsdf    = torch.tensor(gt_bsdf, dtype=torch.float32)
+
+        return samples[0], samples[1], vec_params, gt_bsdf
+    
+    def sample(self, u, v):
+        vec_params, dict_params = self.textures.sample(u, v)       
+        
+        samples = sample_hemisphere(2)
+        normal = np.array((0, 0, 1))
+
+        gt_bsdf = principled_bsdf(samples[0], samples[1], normal, dict_params["basecolor"], dict_params["metallic"], dict_params["roughness"], dict_params["specular"])
+        
+        samples    = torch.tensor(samples, dtype=torch.float32)
+        gt_bsdf    = torch.tensor(gt_bsdf, dtype=torch.float32)
+
+        return samples[0], samples[1], vec_params, gt_bsdf
     
 class PhongDataset(Dataset):
     def __init__(self, n_samples=1000):

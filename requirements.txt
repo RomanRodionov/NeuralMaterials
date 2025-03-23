@@ -4,6 +4,7 @@ matplotlib
 tqdm
 scipy
 torchvision
+tensorboard
 datasets
 opencv-python
 scikit-image

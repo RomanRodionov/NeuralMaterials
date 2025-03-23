@@ -1,6 +1,5 @@
 #include "films.hpp"
-
-using LiteMath::complex, LiteMath::M_PI, LiteMath::float3;
+#include "common.hpp"
 
 //thin film reflections are baised on Airy formulas
 
@@ -54,7 +53,8 @@ float FrFilmRefl(float cosThetaI, complex etaI, complex etaF, complex etaT, floa
   return result / 2;
 }
 
-float film_refl(py::array_t<float> w_i_numpy, py::array_t<float> w_o_numpy, float thickness, float lambda) {
+float film_refl(py::array_t<float> w_i_numpy, py::array_t<float> w_o_numpy, float thickness, float lambda) 
+{
   py::buffer_info w_i_info = w_i_numpy.request();
   float3* w_i = static_cast<float3*>(w_i_info.ptr);
 
