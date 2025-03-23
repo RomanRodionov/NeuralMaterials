@@ -9,6 +9,7 @@ from tqdm.auto import tqdm
 from dataset.materials import TextureDataset, PrincipledDataset
 from brdf_decoder import TextureEncoder, TextureDecoder, LatentTexture
 from skimage.metrics import peak_signal_noise_ratio as base_psnr
+import cv2
 
 ENCODER_PATH = "saved_models/texture_encoder.pth"
 DECODER_PATH = "saved_models/texture_decoder.pth"
@@ -18,7 +19,7 @@ def train_principled(tex_path="resources/materials/test/Metal/tc_metal_029", res
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
-    samples = 15000000
+    samples = 1500000
     batch_size = 128
 
     writer = SummaryWriter("runs/principled_training")
@@ -68,7 +69,9 @@ def generate_latent_texture(tex_path="resources/materials/test/Metal/tc_metal_02
     dataset = TextureDataset(tex_path, resolution=resolution)
     h, w = resolution
 
-    encoder = torch.load(ENCODER_PATH).to(device)
+    encoder = TextureEncoder(hidden_dim=64, latent_dim=8)
+    encoder.load_state_dict(torch.load(ENCODER_PATH))
+    encoder = encoder.to(device)
 
     latent_texture_model = LatentTexture(resolution=resolution, latent_dim=latent_dim).to(device)
     latent_texture_model.eval()
@@ -81,12 +84,24 @@ def generate_latent_texture(tex_path="resources/materials/test/Metal/tc_metal_02
             latent_vector = encoder(vec_params.to(device))
             latent_texture[i, j] = latent_vector.squeeze(0)
 
-    latent_texture_model.set(latent_texture)
+    latent_texture_model.set(latent_texture.permute(2, 0, 1))
 
     torch.save(latent_texture.cpu(), LATENT_TEXTURE_PATH)
     print(f"Latent texture is saved to {LATENT_TEXTURE_PATH}")
 
     return latent_texture
 
+def visualize_latent_texture(latent_texture):
+    save_path = f'./tests/principled/latent.png'
+
+    latent_gray = latent_texture.mean(dim=-1)
+    latent_gray = (latent_gray - latent_gray.min()) / (latent_gray.max() - latent_gray.min())
+    latent_gray = (latent_gray * 255).detach().cpu().numpy().astype(np.uint8)
+    
+    cv2.imwrite(save_path, latent_gray)
+    print(f"Saved latent texture visualization to {save_path}")
+
 if __name__ == "__main__":
-    train_principled()
+    #train_principled()
+    latent_texture = generate_latent_texture()
+    visualize_latent_texture(latent_texture)

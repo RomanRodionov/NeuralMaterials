@@ -3,6 +3,7 @@
 This repository contains:
 - spectrum autoencoder
 - neural Phong illumination model
+- neural principled BSDF with textures
 - neural thin film reflection function
 - neural MESE prediction
 - nothing else
@@ -14,6 +15,10 @@ Spectrum example:
 GT Phong / Neural Phong:
 
 ![gt_phong](https://github.com/RomanRodionov/NeuralMaterials/blob/main/tests/phong/gt_2.png?raw=true) ![neural_phong](https://github.com/RomanRodionov/NeuralMaterials/blob/main/tests/phong/neural_2.png?raw=true)
+
+Neural principled BSDF with latent texture [original paper](https://research.nvidia.com/labs/rtr/neural_appearance_models/):
+
+![latent_texture](https://github.com/RomanRodionov/NeuralMaterials/blob/main/tests/principled/latent.png?raw=true)
 
 Thin films with MESE representation [original paper](https://momentsingraphics.de/Media/Siggraph2019/Peters2019-CompactSpectra.pdf):
 
@@ -33,6 +38,10 @@ To run spectrum encoding demo use:
 To run phong demo use:
 
     python3 phong_demo.py
+
+To run principled demo use:
+
+    python3 principled_demo.py
 
 To run thin_films demo use:
 
