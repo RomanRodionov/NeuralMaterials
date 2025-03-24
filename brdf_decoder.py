@@ -40,8 +40,6 @@ class TextureEncoder(nn.Module):
             nn.ReLU(),            
             nn.Linear(hidden_dim, hidden_dim),
             nn.ReLU(),
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.ReLU(),
             nn.Linear(hidden_dim, latent_dim)
         )
 
@@ -55,9 +53,7 @@ class TextureDecoder(nn.Module):
         
         self.decoder = nn.Sequential(
             nn.Linear(latent_dim + 6, hidden_dim), # latent vector + w_i + w_o
-            nn.ReLU(),
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.ReLU(),            
+            nn.ReLU(),           
             nn.Linear(hidden_dim, hidden_dim),
             nn.ReLU(),
             nn.Linear(hidden_dim, 6),

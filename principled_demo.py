@@ -14,28 +14,34 @@ import cv2
 ENCODER_PATH = "saved_models/texture_encoder.pth"
 DECODER_PATH = "saved_models/texture_decoder.pth"
 LATENT_TEXTURE_PATH = "saved_models/latent_texture.npy"
+FINETUNED_LATENT_PATH = "saved_models/finetuned_latent_texture.npy"
+RESOLUTION = (256, 256)
+LATENT_DIM = 3
 
-def train_principled(tex_path="resources/materials/test/Metal/tc_metal_029", resolution = (128, 128), save_model=True):
+def train_encoder(tex_path="resources/materials/test/Metal/tc_metal_029", resolution = RESOLUTION, save_model=True):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
-    samples = 1500000
+    samples = 3000000
     batch_size = 128
 
-    writer = SummaryWriter("runs/principled_training")
+    writer = SummaryWriter("runs/training_encoder")
 
     tex_dataset = TextureDataset(tex_path, resolution=resolution)
     bsdf_dataset = PrincipledDataset(textures=tex_dataset, n_samples=samples)
-    data_loader = DataLoader(bsdf_dataset, batch_size=batch_size, shuffle=True, num_workers=10)
+    data_loader = DataLoader(bsdf_dataset, batch_size=batch_size, shuffle=True, num_workers=16)
 
-    encoder = TextureEncoder(hidden_dim=64, latent_dim=8).to(device)
-    decoder = TextureDecoder(hidden_dim=64, latent_dim=8).to(device)
-    optimizer = optim.Adam(decoder.parameters(), lr=5e-3)
+    encoder = TextureEncoder(hidden_dim=64, latent_dim=LATENT_DIM).to(device)
+    decoder = TextureDecoder(hidden_dim=64, latent_dim=LATENT_DIM).to(device)
+    optimizer = optim.Adam([
+                            {'params': encoder.parameters()},
+                            {'params': decoder.parameters()}
+                           ], lr=1e-3)
     loss_fn = nn.MSELoss()
 
     progress_bar = tqdm(data_loader)
     for batch, data in enumerate(progress_bar):
-        w_i, w_o, params, gt_bsdf = data
+        w_i, w_o, params, gt_bsdf, uv = data
         w_i = w_i.to(device)
         w_o = w_o.to(device)
         params = params.to(device)
@@ -61,15 +67,15 @@ def train_principled(tex_path="resources/materials/test/Metal/tc_metal_029", res
         print(f"Models are saved to: {ENCODER_PATH}, {DECODER_PATH}")
 
     writer.close()
-    return decoder.to("cpu")
+    return encoder.to("cpu"), decoder.to("cpu")
 
-def generate_latent_texture(tex_path="resources/materials/test/Metal/tc_metal_029", resolution=(128, 128), latent_dim=8):
+def generate_latent_texture(tex_path="resources/materials/test/Metal/tc_metal_029", resolution=RESOLUTION, latent_dim=LATENT_DIM):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
     dataset = TextureDataset(tex_path, resolution=resolution)
     h, w = resolution
 
-    encoder = TextureEncoder(hidden_dim=64, latent_dim=8)
+    encoder = TextureEncoder(hidden_dim=64, latent_dim=LATENT_DIM)
     encoder.load_state_dict(torch.load(ENCODER_PATH))
     encoder = encoder.to(device)
 
@@ -86,14 +92,72 @@ def generate_latent_texture(tex_path="resources/materials/test/Metal/tc_metal_02
 
     latent_texture_model.set(latent_texture.permute(2, 0, 1))
 
-    torch.save(latent_texture.cpu(), LATENT_TEXTURE_PATH)
+    torch.save(latent_texture_model.state_dict(), LATENT_TEXTURE_PATH)
     print(f"Latent texture is saved to {LATENT_TEXTURE_PATH}")
 
-    return latent_texture
+    return latent_texture_model
 
-def visualize_latent_texture(latent_texture):
-    save_path = f'./tests/principled/latent.png'
+def train_decoder(tex_path="resources/materials/test/Metal/tc_metal_029", resolution=RESOLUTION, latent_dim=LATENT_DIM, save_model=True):
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Using device: {device}")
 
+    samples = 10000000
+    batch_size = 128
+
+    writer = SummaryWriter("runs/training_decoder")
+
+    tex_dataset = TextureDataset(tex_path, resolution=resolution)
+    bsdf_dataset = PrincipledDataset(textures=tex_dataset, n_samples=samples)
+    data_loader = DataLoader(bsdf_dataset, batch_size=batch_size, shuffle=True, num_workers=16)
+
+    latent_texture = LatentTexture(resolution=resolution, latent_dim=latent_dim).to(device)
+    latent_texture.load_state_dict(torch.load(LATENT_TEXTURE_PATH, weights_only=False))
+ 
+    decoder = TextureDecoder(hidden_dim=64, latent_dim=LATENT_DIM).to(device)
+    decoder.load_state_dict(torch.load(DECODER_PATH))
+
+    optimizer = optim.Adam([
+                            {'params': latent_texture.parameters(), 'lr': 1e-4},
+                            {'params': decoder.parameters()}
+                           ], lr=1e-3)
+    loss_fn = nn.MSELoss()
+
+    progress_bar = tqdm(data_loader)
+    for batch, data in enumerate(progress_bar):
+        w_i, w_o, params, gt_bsdf, uv = data
+        w_i = w_i.to(device)
+        w_o = w_o.to(device)
+        params = params.to(device)
+        gt_bsdf = gt_bsdf.to(device)
+        uv = uv.to(device)
+
+        optimizer.zero_grad()
+
+        latent = latent_texture(uv)
+        bsdf = decoder(latent, w_i, w_o)
+
+        loss = loss_fn(bsdf, gt_bsdf)
+        loss.backward()
+
+        #print(torch.max(latent_texture.latent_texture.grad), torch.max(decoder.decoder[0].weight.grad))
+
+        optimizer.step()
+        
+        writer.add_scalar("Loss/train", loss.item(), batch)
+        
+        if batch % 100 == 0:
+            progress_bar.set_description(f"Batch {batch}, MSE: {loss.item():.6f}")
+
+    if save_model:
+        torch.save(latent_texture.state_dict(), FINETUNED_LATENT_PATH)
+        torch.save(decoder.state_dict(), DECODER_PATH)
+        print(f"Models are saved to: {FINETUNED_LATENT_PATH}, {DECODER_PATH}")
+
+    writer.close()
+    return latent_texture.to("cpu"), decoder.to("cpu")
+
+def visualize_latent_texture(latent_texture, save_path = './tests/principled/latent.png'):
+    latent_texture = latent_texture.latent_texture.squeeze(0).permute(1, 2, 0)
     latent_gray = latent_texture.mean(dim=-1)
     latent_gray = (latent_gray - latent_gray.min()) / (latent_gray.max() - latent_gray.min())
     latent_gray = (latent_gray * 255).detach().cpu().numpy().astype(np.uint8)
@@ -102,6 +166,10 @@ def visualize_latent_texture(latent_texture):
     print(f"Saved latent texture visualization to {save_path}")
 
 if __name__ == "__main__":
-    #train_principled()
-    latent_texture = generate_latent_texture()
-    visualize_latent_texture(latent_texture)
+    #train_encoder()
+    #latent_texture = generate_latent_texture()
+    #visualize_latent_texture(latent_texture, './tests/principled/latent.png')
+    finetuned_latent, _ = train_decoder()
+    visualize_latent_texture(finetuned_latent, './tests/principled/finetuned_latent.png')
+    
+

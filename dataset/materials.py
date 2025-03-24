@@ -73,17 +73,8 @@ class PrincipledDataset(Dataset):
         return self.n_samples
     
     def __getitem__(self, idx):
-        vec_params, dict_params = self.textures[idx]        
-        
-        samples = sample_hemisphere(2)
-        normal = np.array((0, 0, 1))
-
-        gt_bsdf = principled_bsdf(samples[0], samples[1], normal, dict_params["basecolor"], dict_params["metallic"], dict_params["roughness"], dict_params["specular"])
-        
-        samples    = torch.tensor(samples, dtype=torch.float32)
-        gt_bsdf    = torch.tensor(gt_bsdf, dtype=torch.float32)
-
-        return samples[0], samples[1], vec_params, gt_bsdf
+        u, v = np.random.rand(), np.random.rand()
+        return self.sample(u, v)
     
     def sample(self, u, v):
         vec_params, dict_params = self.textures.sample(u, v)       
@@ -95,8 +86,9 @@ class PrincipledDataset(Dataset):
         
         samples    = torch.tensor(samples, dtype=torch.float32)
         gt_bsdf    = torch.tensor(gt_bsdf, dtype=torch.float32)
+        uv = torch.tensor((u, v))
 
-        return samples[0], samples[1], vec_params, gt_bsdf
+        return samples[0], samples[1], vec_params, gt_bsdf, uv
     
 class PhongDataset(Dataset):
     def __init__(self, n_samples=1000):
