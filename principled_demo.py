@@ -23,7 +23,7 @@ def train_encoder(tex_path="resources/materials/test/Metal/tc_metal_029", resolu
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
-    samples = 3000000
+    samples = 3000
     batch_size = 128
 
     writer = SummaryWriter("runs/training_encoder")
@@ -69,7 +69,7 @@ def train_encoder(tex_path="resources/materials/test/Metal/tc_metal_029", resolu
 
     writer.close()
 
-    decoder.save_raw(DECODER_RAW_PATH);
+    decoder.save_raw(DECODER_RAW_PATH)
 
     return decoder.to("cpu")
 
@@ -170,10 +170,10 @@ def visualize_latent_texture(latent_texture, save_path = './tests/principled/lat
     print(f"Saved latent texture visualization to {save_path}")
 
 if __name__ == "__main__":
-    #train_encoder()
-    #latent_texture = generate_latent_texture()
-    #visualize_latent_texture(latent_texture, './tests/principled/latent.png')
-    finetuned_latent, _ = train_decoder()
-    visualize_latent_texture(finetuned_latent, './tests/principled/finetuned_latent.png')
+    train_encoder()
+    latent_texture = generate_latent_texture()
+    visualize_latent_texture(latent_texture, './tests/principled/latent.png')
+    #finetuned_latent, _ = train_decoder()
+    #visualize_latent_texture(finetuned_latent, './tests/principled/finetuned_latent.png')
     
 

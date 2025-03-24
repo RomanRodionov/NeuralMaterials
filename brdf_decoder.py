@@ -66,19 +66,19 @@ class TextureDecoder(nn.Module):
         z = self.decoder(z)
         return z
 
-    def save_raw(path):
+    def save_raw(self, path):
         with open(path, "wb") as f:
-            f.write("hydrann1")
+            f.write("hydrann1".encode("utf-8"))
             layers = [x for x in self.decoder.children() if isinstance(x, nn.Linear)]
-            f.write(len(layer).to_bytes(4, "little"))
+            f.write(len(layers).to_bytes(4, "little"))
             for layer in layers:
-                weight = layer.weight
-                bias = layer.bias
+                weight = layer.weight.cpu().detach()
+                bias = layer.bias.cpu().detach()
 
                 f.write(weight.shape[0].to_bytes(4, "little"))
                 f.write(weight.shape[1].to_bytes(4, "little"))
-                f.write(bytes(weight.byte(torch.contiguous_format)))
-                f.write(bytes(bias.byte(torch.contiguous_format)))
+                f.write(weight.byte(memory_format=torch.contiguous_format).numpy().tobytes())
+                f.write(bias.byte(memory_format=torch.contiguous_format).numpy().tobytes())
 
 class SimpleDecoder(nn.Module):
     def __init__(self, hidden_dim=64, output_dim=3):
