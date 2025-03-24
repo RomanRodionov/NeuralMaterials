@@ -17,8 +17,11 @@ class LatentTexture(nn.Module):
         self.latent_texture = nn.Parameter(torch.randn(1, latent_dim, *resolution))
 
     def set(self, latent_texture):
-        assert latent_texture.shape == (self.latent_dim, *self.resolution)
-        self.latent_texture.data = latent_texture.unsqueeze(0)
+        assert latent_texture.shape == (*self.resolution, self.latent_dim)
+        self.latent_texture.data = latent_texture.permute(2, 0, 1).unsqueeze(0)
+
+    def get_texture(self):
+        return self.latent_texture.data.squeeze(0).permute(1, 2, 0)
 
     def forward(self, uv):
         N = uv.shape[0]
@@ -27,7 +30,7 @@ class LatentTexture(nn.Module):
 
         sampled_latents = F.grid_sample(self.latent_texture, uv, align_corners=True)
         
-        return sampled_latents.view(N, self.latent_dim)
+        return sampled_latents.permute(0, 2, 3, 1).view(N, self.latent_dim)
 
 class TextureEncoder(nn.Module):
     def __init__(self, hidden_dim=64, latent_dim=8):

@@ -18,13 +18,16 @@ LATENT_TEXTURE_PATH = "saved_models/latent_texture.npy"
 FINETUNED_LATENT_PATH = "saved_models/finetuned_latent_texture.npy"
 RESOLUTION = (256, 256)
 LATENT_DIM = 3
+BATCH_SIZE = 128
+ENCODER_SAMPLES = 3000
+DECODER_SAMPLES = 3000
 
 def train_encoder(tex_path="resources/materials/test/Metal/tc_metal_029", resolution = RESOLUTION, save_model=True):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
-    samples = 3000
-    batch_size = 128
+    samples = ENCODER_SAMPLES
+    batch_size = BATCH_SIZE
 
     writer = SummaryWriter("runs/training_encoder")
 
@@ -94,7 +97,7 @@ def generate_latent_texture(tex_path="resources/materials/test/Metal/tc_metal_02
             latent_vector = encoder(vec_params.to(device))
             latent_texture[i, j] = latent_vector.squeeze(0)
 
-    latent_texture_model.set(latent_texture.permute(2, 0, 1))
+    latent_texture_model.set(latent_texture)
 
     torch.save(latent_texture_model.state_dict(), LATENT_TEXTURE_PATH)
     print(f"Latent texture is saved to {LATENT_TEXTURE_PATH}")
@@ -105,8 +108,8 @@ def train_decoder(tex_path="resources/materials/test/Metal/tc_metal_029", resolu
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
-    samples = 10000000
-    batch_size = 128
+    samples = DECODER_SAMPLES
+    batch_size = BATCH_SIZE
 
     writer = SummaryWriter("runs/training_decoder")
 
@@ -121,9 +124,9 @@ def train_decoder(tex_path="resources/materials/test/Metal/tc_metal_029", resolu
     decoder.load_state_dict(torch.load(DECODER_PATH))
 
     optimizer = optim.Adam([
-                            {'params': latent_texture.parameters(), 'lr': 1e-4},
+                            {'params': latent_texture.parameters(), 'lr': 1e-3},
                             {'params': decoder.parameters()}
-                           ], lr=1e-3)
+                           ], lr=5e-4)
     loss_fn = nn.MSELoss()
 
     progress_bar = tqdm(data_loader)
@@ -161,7 +164,7 @@ def train_decoder(tex_path="resources/materials/test/Metal/tc_metal_029", resolu
     return latent_texture.to("cpu"), decoder.to("cpu")
 
 def visualize_latent_texture(latent_texture, save_path = './tests/principled/latent.png'):
-    latent_texture = latent_texture.latent_texture.squeeze(0).permute(1, 2, 0)
+    latent_texture = latent_texture.get_texture()
     latent_gray = latent_texture.mean(dim=-1)
     latent_gray = (latent_gray - latent_gray.min()) / (latent_gray.max() - latent_gray.min())
     latent_gray = (latent_gray * 255).detach().cpu().numpy().astype(np.uint8)
@@ -173,7 +176,7 @@ if __name__ == "__main__":
     train_encoder()
     latent_texture = generate_latent_texture()
     visualize_latent_texture(latent_texture, './tests/principled/latent.png')
-    #finetuned_latent, _ = train_decoder()
-    #visualize_latent_texture(finetuned_latent, './tests/principled/finetuned_latent.png')
+    finetuned_latent, _ = train_decoder()
+    visualize_latent_texture(finetuned_latent, './tests/principled/finetuned_latent.png')
     
 
