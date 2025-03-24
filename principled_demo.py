@@ -13,7 +13,7 @@ import cv2
 
 ENCODER_PATH = "saved_models/texture_encoder.pth"
 DECODER_PATH = "saved_models/texture_decoder.pth"
-DECODER_RAW_PATH = "saved_models/texture_decored.bin"
+DECODER_RAW_PATH = "saved_models/texture_decoder.bin"
 LATENT_TEXTURE_PATH = "saved_models/latent_texture.npy"
 FINETUNED_LATENT_PATH = "saved_models/finetuned_latent_texture.npy"
 RESOLUTION = (256, 256)

@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.init as init
 import torch.nn.functional as F
-
+import numpy as np
 #https://research.nvidia.com/labs/rtr/neural_appearance_models/assets/nvidia_neural_materials_author_paper.pdf
 
 # simpled variant
@@ -72,13 +72,13 @@ class TextureDecoder(nn.Module):
             layers = [x for x in self.decoder.children() if isinstance(x, nn.Linear)]
             f.write(len(layers).to_bytes(4, "little"))
             for layer in layers:
-                weight = layer.weight.cpu().detach()
-                bias = layer.bias.cpu().detach()
+                weight = np.ascontiguousarray(layer.weight.cpu().detach().numpy(), dtype=np.float32)
+                bias = np.ascontiguousarray(layer.bias.cpu().detach().numpy(), dtype=np.float32)
 
                 f.write(weight.shape[0].to_bytes(4, "little"))
                 f.write(weight.shape[1].to_bytes(4, "little"))
-                f.write(weight.byte(memory_format=torch.contiguous_format).numpy().tobytes())
-                f.write(bias.byte(memory_format=torch.contiguous_format).numpy().tobytes())
+                f.write(weight.tobytes())
+                f.write(bias.tobytes())
 
 class SimpleDecoder(nn.Module):
     def __init__(self, hidden_dim=64, output_dim=3):
