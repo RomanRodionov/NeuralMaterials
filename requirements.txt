@@ -1,3 +1,4 @@
+setuptools
 torch
 numpy
 matplotlib

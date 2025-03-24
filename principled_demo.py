@@ -13,6 +13,7 @@ import cv2
 
 ENCODER_PATH = "saved_models/texture_encoder.pth"
 DECODER_PATH = "saved_models/texture_decoder.pth"
+DECODER_RAW_PATH = "saved_models/texture_decored.bin"
 LATENT_TEXTURE_PATH = "saved_models/latent_texture.npy"
 FINETUNED_LATENT_PATH = "saved_models/finetuned_latent_texture.npy"
 RESOLUTION = (256, 256)
@@ -67,7 +68,10 @@ def train_encoder(tex_path="resources/materials/test/Metal/tc_metal_029", resolu
         print(f"Models are saved to: {ENCODER_PATH}, {DECODER_PATH}")
 
     writer.close()
-    return encoder.to("cpu"), decoder.to("cpu")
+
+    decoder.save_raw(DECODER_RAW_PATH);
+
+    return decoder.to("cpu")
 
 def generate_latent_texture(tex_path="resources/materials/test/Metal/tc_metal_029", resolution=RESOLUTION, latent_dim=LATENT_DIM):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
