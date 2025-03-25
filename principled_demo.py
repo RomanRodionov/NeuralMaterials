@@ -16,11 +16,11 @@ DECODER_PATH = "saved_models/texture_decoder.pth"
 DECODER_RAW_PATH = "saved_models/texture_decoder.bin"
 LATENT_TEXTURE_PATH = "saved_models/latent_texture.npy"
 FINETUNED_LATENT_PATH = "saved_models/finetuned_latent_texture.npy"
-RESOLUTION = (128, 128)
-LATENT_DIM = 3
-BATCH_SIZE = 16000
-ENCODER_ITERS = 3000
-DECODER_ITERS = 3000
+RESOLUTION = (1024, 1024)
+LATENT_DIM = 4
+BATCH_SIZE = 16384
+ENCODER_ITERS = 5000
+DECODER_ITERS = 5000
 
 def train_encoder(tex_path="resources/materials/test/Metal/tc_metal_029", resolution = RESOLUTION, save_model=True):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -104,14 +104,14 @@ def generate_latent_texture(tex_path="resources/materials/test/Metal/tc_metal_02
 
     return latent_texture_model
 
-def train_decoder(tex_path="resources/materials/test/Metal/tc_metal_029", resolution=RESOLUTION, latent_dim=LATENT_DIM, save_model=True):
+def finetune_latent(tex_path="resources/materials/test/Metal/tc_metal_029", resolution=RESOLUTION, latent_dim=LATENT_DIM, save_model=True):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
     samples = DECODER_ITERS * BATCH_SIZE
     batch_size = BATCH_SIZE
 
-    writer = SummaryWriter("runs/training_decoder")
+    writer = SummaryWriter("runs/finetuning_latent")
 
     tex_dataset = TextureDataset(tex_path, resolution=resolution)
     bsdf_dataset = PrincipledDataset(textures=tex_dataset, n_samples=samples)
@@ -125,10 +125,10 @@ def train_decoder(tex_path="resources/materials/test/Metal/tc_metal_029", resolu
 
     optimizer = optim.Adam([
                             {'params': latent_texture.parameters()},
-                            {'params': decoder.parameters()}
-                           ], lr=1e-3)
+                            #{'params': decoder.parameters()}
+                           ], lr=1e-4)
     
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=DECODER_ITERS, eta_min=1e-4)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=DECODER_ITERS, eta_min=5e-5)
     loss_fn = nn.MSELoss()
 
     progress_bar = tqdm(data_loader)
@@ -160,16 +160,14 @@ def train_decoder(tex_path="resources/materials/test/Metal/tc_metal_029", resolu
 
     if save_model:
         torch.save(latent_texture.state_dict(), FINETUNED_LATENT_PATH)
-        torch.save(decoder.state_dict(), DECODER_PATH)
+        #torch.save(decoder.state_dict(), DECODER_PATH)
         print(f"Models are saved to: {FINETUNED_LATENT_PATH}, {DECODER_PATH}")
 
     writer.close()
-    return latent_texture.to("cpu"), decoder.to("cpu")
+    return latent_texture.to("cpu")
 
 def visualize_latent_texture(latent_texture, save_path = './tests/principled/latent.png'):
-    print("A")
     latent_texture = latent_texture.get_texture()
-    print("B")
     latent_gray = latent_texture.mean(dim=-1)
     latent_gray = (latent_gray - latent_gray.min()) / (latent_gray.max() - latent_gray.min())
     latent_gray = (latent_gray * 255).detach().cpu().numpy().astype(np.uint8)
@@ -179,9 +177,9 @@ def visualize_latent_texture(latent_texture, save_path = './tests/principled/lat
 
 if __name__ == "__main__":
     #train_encoder()
-    latent_texture = generate_latent_texture()
-    visualize_latent_texture(latent_texture, './tests/principled/latent.png')
-    finetuned_latent, _ = train_decoder()
+    #latent_texture = generate_latent_texture()
+    #visualize_latent_texture(latent_texture, './tests/principled/latent.png')
+    finetuned_latent = finetune_latent()
     visualize_latent_texture(finetuned_latent, './tests/principled/finetuned_latent.png')
     
 

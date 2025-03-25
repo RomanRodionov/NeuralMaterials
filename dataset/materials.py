@@ -44,8 +44,8 @@ class TextureDataset(Dataset):
     def sample(self, u, v):
         h, w = self.resolution
 
-        i = u * (h - 1)
-        j = v * (w - 1)
+        i = v * (h - 1)
+        j = u * (w - 1)
 
         i0, j0 = int(np.floor(i)), int(np.floor(j))
         i1, j1 = min(i0 + 1, h - 1), min(j0 + 1, w - 1)
