@@ -5,8 +5,6 @@ import torch.nn.functional as F
 import numpy as np
 #https://research.nvidia.com/labs/rtr/neural_appearance_models/assets/nvidia_neural_materials_author_paper.pdf
 
-# simpled variant
-
 class LatentTexture(nn.Module):
     def __init__(self, resolution=(128, 128), latent_dim=8):
         super(LatentTexture, self).__init__()
@@ -93,20 +91,34 @@ class SimpleDecoder(nn.Module):
         
         self.decoder = nn.Sequential(
             nn.Linear(6, hidden_dim),
-            nn.GELU(),
+            nn.ReLU(),           
             nn.Linear(hidden_dim, hidden_dim),
-            nn.GELU(),            
+            nn.ReLU(),           
             nn.Linear(hidden_dim, hidden_dim),
-            nn.GELU(),
+            nn.ReLU(),
             nn.Linear(hidden_dim, 6),
-            nn.GELU(),
-            nn.Linear(6, output_dim)
+            nn.ReLU(),
+            nn.Linear(6, 3)
         )
 
     def forward(self, w_i, w_o):
         z = torch.cat([w_i, w_o], dim=-1)
         z = self.decoder(z)
         return z
+    
+    def save_raw(self, path):
+        with open(path, "wb") as f:
+            f.write("hydrann1".encode("utf-8"))
+            layers = [x for x in self.decoder.children() if isinstance(x, nn.Linear)]
+            f.write(len(layers).to_bytes(4, "little"))
+            for layer in layers:
+                weight = np.ascontiguousarray(layer.weight.cpu().detach().numpy(), dtype=np.float32)
+                bias = np.ascontiguousarray(layer.bias.cpu().detach().numpy(), dtype=np.float32)
+
+                f.write(weight.shape[0].to_bytes(4, "little"))
+                f.write(weight.shape[1].to_bytes(4, "little"))
+                f.write(weight.tobytes())
+                f.write(bias.tobytes())
     
 class SpectralDecoder(nn.Module):
     def __init__(self, hidden_dim=32, output_dim=1):

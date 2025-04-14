@@ -176,9 +176,9 @@ def visualize_latent_texture(latent_texture, save_path = './tests/principled/lat
     print(f"Saved latent texture visualization to {save_path}")
 
 if __name__ == "__main__":
-    #train_encoder()
-    #latent_texture = generate_latent_texture()
-    #visualize_latent_texture(latent_texture, './tests/principled/latent.png')
+    train_encoder()
+    latent_texture = generate_latent_texture()
+    visualize_latent_texture(latent_texture, './tests/principled/latent.png')
     finetuned_latent = finetune_latent()
     visualize_latent_texture(finetuned_latent, './tests/principled/finetuned_latent.png')
     

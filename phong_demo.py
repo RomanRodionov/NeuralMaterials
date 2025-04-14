@@ -11,6 +11,8 @@ from brdf_decoder import SimpleDecoder
 from skimage.metrics import peak_signal_noise_ratio as base_psnr
 import cv2
 
+DECODER_RAW_PATH = "saved_models/simple_decoder.bin"
+
 def train_decoder():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
@@ -39,6 +41,8 @@ def train_decoder():
         
         if batch % 100 == 0:
             progress_bar.set_description(f"Batch {batch}, MSE: {loss.item():.6f}")
+
+    decoder.save_raw(DECODER_RAW_PATH)
     
     return decoder.to("cpu")
 

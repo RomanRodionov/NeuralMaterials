@@ -99,8 +99,7 @@ class PhongDataset(Dataset):
         return self.n_samples
     
     def __getitem__(self, idx):
-        rnd = torch.randn(2, 3, dtype=torch.float32)
-        sample = rnd / torch.linalg.norm(rnd, dim=-1, keepdim=True)
+        sample = torch.tensor(sample_hemisphere(2), dtype=torch.float32)
         return sample[0], sample[1], phong(sample[0], sample[1])
 
 class IridescenceDataset(Dataset):
