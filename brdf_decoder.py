@@ -121,7 +121,7 @@ class SimpleDecoder(nn.Module):
                 f.write(bias.tobytes())
     
 class SpectralDecoder(nn.Module):
-    def __init__(self, hidden_dim=64, output_dim=1):
+    def __init__(self, hidden_dim=64, output_dim=1, wavelength_min=360, wavelength_max=830):
         super(SpectralDecoder, self).__init__()
 
         #self.vectors_encoder = nn.Sequential(

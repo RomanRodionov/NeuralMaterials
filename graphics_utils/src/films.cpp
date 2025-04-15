@@ -53,15 +53,22 @@ float FrFilmRefl(float cosThetaI, complex etaI, complex etaF, complex etaT, floa
   return result / 2;
 }
 
-float film_refl(py::array_t<float> w_i_numpy, py::array_t<float> w_o_numpy, float thickness, float lambda) 
+float film_refl(py::array_t<float> w_i_numpy, py::array_t<float> w_o_numpy, py::array_t<float> etaI_numpy, py::array_t<float> etaF_numpy, py::array_t<float>  etaT_numpy, float thickness, float lambda) 
 {
   py::buffer_info w_i_info = w_i_numpy.request();
   float3* w_i = static_cast<float3*>(w_i_info.ptr);
 
-  float cosThetaI = LiteMath::normalize(*w_i).z;
+  py::buffer_info etaI_info = etaI_numpy.request();
+  float* etaI = static_cast<float*>(etaI_info.ptr);
 
-  // hardcode some parameters (to modify in future)
-  float result = FrFilmRefl(cosThetaI, complex(1.f, 0.f), complex(2.f, 0.f), complex(1.5f, 0.f), thickness, lambda);
+  py::buffer_info etaF_info = etaF_numpy.request();
+  float* etaF = static_cast<float*>(etaF_info.ptr);
+
+  py::buffer_info etaT_info = etaT_numpy.request();
+  float* etaT = static_cast<float*>(etaT_info.ptr);
+
+  float cosThetaI = LiteMath::normalize(*w_i).z;
+  float result = FrFilmRefl(cosThetaI, complex(etaI[0], etaI[1]), complex(etaF[0], etaF[1]), complex(etaT[0], etaT[1]), thickness, lambda);
 
   return result;
 }

@@ -15,7 +15,7 @@ def train_decoder():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
-    samples = 25000000
+    samples = 2500000
     batch_size = 2048
 
     dataset = IridescenceDataset(n_samples=samples, film_thickness=300)
@@ -43,6 +43,7 @@ def train_decoder():
             progress_bar.set_description(f"Batch {batch}, MSE: {loss.item():.6f}")
 
     decoder.save_raw(DECODER_RAW_PATH)
+    print(decoder.decoder)
     
     return decoder.to("cpu")
 
@@ -50,7 +51,7 @@ if __name__ == "__main__":
     decoder = train_decoder().cpu()
 
     num_points = 100
-    wavelength_range = np.linspace(380, 780, num_points)
+    wavelength_range = np.linspace(360, 830, num_points)
     thickness = 300
     num_angles = 50
 
@@ -59,12 +60,16 @@ if __name__ == "__main__":
     ]
     w_o = (0.5, 0.0, 0.5)  # doesn't mean yet
 
+    eta_i = np.array([1.0, 0.0], dtype=np.float32)
+    eta_f = np.array([2.0, 0.0], dtype=np.float32)
+    eta_t = np.array([1.5, 0.0], dtype=np.float32)
+
     gt_map = np.zeros((num_angles, num_points))
     predicted_map = np.zeros((num_angles, num_points))
 
     for i, w_i in enumerate(w_i_vectors):
         for j, wavelength in enumerate(wavelength_range):
-            gt_map[i, j] = film_refl(w_i, w_o, thickness, wavelength)
+            gt_map[i, j] = film_refl(w_i, w_o, eta_i, eta_f, eta_t, thickness, wavelength)
             
             with torch.no_grad():
                 predicted_map[i, j] = decoder(
@@ -75,13 +80,13 @@ if __name__ == "__main__":
 
     fig, axs = plt.subplots(1, 2, figsize=(12, 5))
 
-    im1 = axs[0].imshow(gt_map, aspect='auto', cmap='jet', extent=[380, 780, 0, 90])
+    im1 = axs[0].imshow(gt_map, aspect='auto', cmap='jet', extent=[360, 830, 0, 90])
     axs[0].set_title("Ground Truth Reflection")
     axs[0].set_xlabel("Wavelength (nm)")
     axs[0].set_ylabel("Incident Angle (degrees)")
     fig.colorbar(im1, ax=axs[0])
 
-    im2 = axs[1].imshow(predicted_map, aspect='auto', cmap='jet', extent=[380, 780, 0, 90])
+    im2 = axs[1].imshow(predicted_map, aspect='auto', cmap='jet', extent=[360, 830, 0, 90])
     axs[1].set_title("Predicted Reflection")
     axs[1].set_xlabel("Wavelength (nm)")
     axs[1].set_ylabel("Incident Angle (degrees)")
