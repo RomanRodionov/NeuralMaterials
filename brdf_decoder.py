@@ -121,33 +121,54 @@ class SimpleDecoder(nn.Module):
                 f.write(bias.tobytes())
     
 class SpectralDecoder(nn.Module):
-    def __init__(self, hidden_dim=32, output_dim=1):
+    def __init__(self, hidden_dim=64, output_dim=1):
         super(SpectralDecoder, self).__init__()
 
-        self.vectors_encoder = nn.Sequential(
-            nn.Linear(6, hidden_dim // 2),
-            nn.SiLU()
-        )
+        #self.vectors_encoder = nn.Sequential(
+        #    nn.Linear(6, hidden_dim // 2),
+        #    nn.ReLU()
+        #)
 
-        self.wavelength_encoder = nn.Sequential(
-            nn.Linear(1, hidden_dim // 2),
-            nn.SiLU()
-        )
+        #self.wavelength_encoder = nn.Sequential(
+        #    nn.Linear(1, hidden_dim // 2),
+        #    nn.ReLU()
+        #)
         
         self.decoder = nn.Sequential(
+            nn.Linear(7, hidden_dim),
+            nn.ReLU(),
             nn.Linear(hidden_dim, hidden_dim),
-            nn.SiLU(),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU(),
             nn.Linear(hidden_dim, 6),
-            nn.SiLU(),
+            nn.ReLU(),
             nn.Linear(6, output_dim)
         )
 
     def forward(self, w_i, w_o, wavelength):
-        v = self.vectors_encoder(torch.cat([w_i, w_o], dim=-1))
-        w = self.wavelength_encoder(wavelength.unsqueeze(-1))
-        z = torch.cat([v, w], dim=-1)
+        #v = self.vectors_encoder(torch.cat([w_i, w_o], dim=-1))
+        #w = self.wavelength_encoder(wavelength.unsqueeze(-1))
+        w = (wavelength - 380) / 400
+        z = torch.cat([w_i, w_o, w.unsqueeze(-1)], dim=-1)
         z = self.decoder(z)
         return z
+        
+    def save_raw(self, path):
+        with open(path, "wb") as f:
+            f.write("hydrann1".encode("utf-8"))
+            layers = [x for x in self.decoder.children() if isinstance(x, nn.Linear)]
+            f.write(len(layers).to_bytes(4, "little"))
+            for layer in layers:
+                weight = np.ascontiguousarray(layer.weight.cpu().detach().numpy(), dtype=np.float32)
+                bias = np.ascontiguousarray(layer.bias.cpu().detach().numpy(), dtype=np.float32)
+
+                f.write(weight.shape[0].to_bytes(4, "little"))
+                f.write(weight.shape[1].to_bytes(4, "little"))
+                f.write(weight.tobytes())
+                f.write(bias.tobytes())
     
 class MomentsDecoder(nn.Module):
     def __init__(self, hidden_dim=16, output_dim=6):

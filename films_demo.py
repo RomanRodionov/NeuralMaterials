@@ -9,20 +9,21 @@ from graphics_utils import film_refl
 from dataset.materials import IridescenceDataset
 from brdf_decoder import SpectralDecoder, initialize_weights
 
+DECODER_RAW_PATH = "saved_models/spectral_decoder.bin"
 
 def train_decoder():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
-    samples = 10000000
-    batch_size = 1024
+    samples = 25000000
+    batch_size = 2048
 
-    dataset = IridescenceDataset(n_samples=samples)
+    dataset = IridescenceDataset(n_samples=samples, film_thickness=300)
     data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=20)
 
     decoder = SpectralDecoder(hidden_dim=16, output_dim=1).to(device)
     initialize_weights(decoder, "normal")
-    optimizer = optim.Adam(decoder.parameters(), lr=3e-3)
+    optimizer = optim.Adam(decoder.parameters(), lr=1e-3)
     loss_fn = nn.MSELoss()
 
     progress_bar = tqdm(data_loader)
@@ -38,8 +39,10 @@ def train_decoder():
         loss.backward()
         optimizer.step()
         
-        if batch % 100 == 0:
+        if batch % 25 == 0:
             progress_bar.set_description(f"Batch {batch}, MSE: {loss.item():.6f}")
+
+    decoder.save_raw(DECODER_RAW_PATH)
     
     return decoder.to("cpu")
 

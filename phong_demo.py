@@ -11,9 +11,10 @@ from brdf_decoder import SimpleDecoder
 from skimage.metrics import peak_signal_noise_ratio as base_psnr
 import cv2
 
+DECODER_PATH = "saved_models/simple_decoder.pth"
 DECODER_RAW_PATH = "saved_models/simple_decoder.bin"
 
-def train_decoder():
+def train_decoder(save_model=True):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
@@ -42,9 +43,22 @@ def train_decoder():
         if batch % 100 == 0:
             progress_bar.set_description(f"Batch {batch}, MSE: {loss.item():.6f}")
 
-    decoder.save_raw(DECODER_RAW_PATH)
+    if save_model:
+        decoder.save_raw(DECODER_RAW_PATH)
+        torch.save(decoder.state_dict(), DECODER_PATH)
+        print(f"Models are saved to: {DECODER_PATH}")
     
     return decoder.to("cpu")
+
+def test():
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    decoder = SimpleDecoder()
+    decoder.load_state_dict(torch.load(DECODER_PATH))
+    decoder = decoder.to(device)
+
+    with torch.no_grad():
+        x = torch.tensor([1, 1, 0, 1, 0, 1], dtype=torch.float32).to(device)
+        print(decoder.decoder[0].weight.shape)
 
 def neural_phong_demo(decoder, view_dir=(0, 0, 1), size=128):
     view_dir = torch.tensor(view_dir, dtype=torch.float32)
@@ -86,12 +100,15 @@ def phong_demo(view_dir=(0, 0, 1), size=128):
     return image
 
 if __name__ == "__main__":
-    decoder = train_decoder()
-    views = [(0, 0, 1), (0.5, 0, 0.5), (0, 0.5, 0.5)]
+    #decoder = train_decoder()
 
-    for i, view in enumerate(views):
-        gt = phong_demo(view)
-        cv2.imwrite(f'./tests/phong/gt_{i + 1}.png', gt * 255.0)
-        img = neural_phong_demo(decoder, view)
-        cv2.imwrite(f'./tests/phong/neural_{i + 1}.png', img * 255.0)
-        print("PSNR: ", base_psnr(gt, img))
+    test()
+
+    #views = [(0, 0, 1), (0.5, 0, 0.5), (0, 0.5, 0.5)]
+
+    #for i, view in enumerate(views):
+    #    gt = phong_demo(view)
+    #    cv2.imwrite(f'./tests/phong/gt_{i + 1}.png', gt * 255.0)
+    #    img = neural_phong_demo(decoder, view)
+    #    cv2.imwrite(f'./tests/phong/neural_{i + 1}.png', img * 255.0)
+    #    print("PSNR: ", base_psnr(gt, img))
