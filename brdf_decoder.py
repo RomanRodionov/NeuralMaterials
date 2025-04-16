@@ -136,15 +136,15 @@ class SpectralDecoder(nn.Module):
         
         self.decoder = nn.Sequential(
             nn.Linear(7, hidden_dim),
-            nn.SiLU(),
+            nn.ReLU(),
             nn.Linear(hidden_dim, hidden_dim),
-            nn.SiLU(),
+            nn.ReLU(),
             nn.Linear(hidden_dim, hidden_dim),
-            nn.SiLU(),
+            nn.ReLU(),
             nn.Linear(hidden_dim, hidden_dim),
-            nn.SiLU(),
+            nn.ReLU(),
             nn.Linear(hidden_dim, 6),
-            nn.SiLU(),
+            nn.ReLU(),
             nn.Linear(6, output_dim),
             nn.ReLU(inplace=True)
         )

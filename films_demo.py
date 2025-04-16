@@ -43,7 +43,7 @@ def train_decoder():
         sam = F.cosine_similarity(value, labels).mean()
         loss2 = (1 - sam)
 
-        loss = loss1 + 0.4 * loss2
+        loss = loss1 + 0.02 * loss2
         loss.backward()
         optimizer.step()
         
