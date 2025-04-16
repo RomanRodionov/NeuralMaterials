@@ -136,16 +136,17 @@ class SpectralDecoder(nn.Module):
         
         self.decoder = nn.Sequential(
             nn.Linear(7, hidden_dim),
-            nn.ReLU(),
+            nn.SiLU(),
             nn.Linear(hidden_dim, hidden_dim),
-            nn.ReLU(),
+            nn.SiLU(),
             nn.Linear(hidden_dim, hidden_dim),
-            nn.ReLU(),
+            nn.SiLU(),
             nn.Linear(hidden_dim, hidden_dim),
-            nn.ReLU(),
+            nn.SiLU(),
             nn.Linear(hidden_dim, 6),
-            nn.ReLU(),
-            nn.Linear(6, output_dim)
+            nn.SiLU(),
+            nn.Linear(6, output_dim),
+            nn.ReLU(inplace=True)
         )
 
     def forward(self, w_i, w_o, wavelength):

@@ -103,12 +103,13 @@ class PhongDataset(Dataset):
         return sample[0], sample[1], phong(sample[0], sample[1])
 
 class IridescenceDataset(Dataset):
-    def __init__(self, min_wavelength=360, max_wavelength=830, film_thickness=300, n_samples=1000):
+    def __init__(self, min_wavelength=360, max_wavelength=830, film_thickness=300, n_samples=1000, wl_samples=67):
         self.min_wavelength = min_wavelength
         self.max_wavelength = max_wavelength
         self.range = max_wavelength - min_wavelength
         self.film_thickness = film_thickness
         self.n_samples = n_samples
+        self.wl_samples = wl_samples
 
         self.eta_i = np.array([1.0, 0.0], dtype=np.float32)
         self.eta_f = np.array([2.0, 0.0], dtype=np.float32)
@@ -119,14 +120,14 @@ class IridescenceDataset(Dataset):
     
     def __getitem__(self, idx):
         samples = sample_hemisphere(2)
-        wavelength = np.random.rand() * self.range + self.min_wavelength
-        value = film_refl(samples[0], samples[1], self.eta_i, self.eta_f, self.eta_t, self.film_thickness, wavelength)
+        wavelengths = np.linspace(self.min_wavelength, self.max_wavelength, self.wl_samples) + np.random.rand(self.wl_samples) * (self.range / self.wl_samples) 
+        values = film_refl(samples[0], samples[1], self.eta_i, self.eta_f, self.eta_t, self.film_thickness, wavelengths)
 
         samples    = torch.tensor(samples, dtype=torch.float32)
-        wavelength = torch.tensor(wavelength, dtype=torch.float32)
-        value      = torch.tensor(value, dtype=torch.float32)
+        wavelengths = torch.tensor(wavelengths, dtype=torch.float32)
+        values      = torch.tensor(values, dtype=torch.float32)
 
-        return samples[0], samples[1], wavelength, value
+        return samples[0].expand(self.wl_samples, -1), samples[1].expand(self.wl_samples, -1), wavelengths, values
 
 class MomentsDataset(Dataset):
     def __init__(self, min_wavelength=380, max_wavelength=780, film_thickness=300, n_moments=6, n_points=100, n_samples=1000):

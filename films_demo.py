@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import torch.nn.functional as F
+
 import numpy as np
 import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader
@@ -15,32 +17,38 @@ def train_decoder():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
-    samples = 2500000
+    samples = 25000000
     batch_size = 2048
+    wl_samples = (830 - 360) // 10
 
-    dataset = IridescenceDataset(n_samples=samples, film_thickness=300)
+    dataset = IridescenceDataset(n_samples=samples, film_thickness=300, wl_samples=wl_samples)
     data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=20)
 
-    decoder = SpectralDecoder(hidden_dim=16, output_dim=1).to(device)
+    decoder = SpectralDecoder(hidden_dim=24, output_dim=1).to(device)
     initialize_weights(decoder, "normal")
     optimizer = optim.Adam(decoder.parameters(), lr=1e-3)
-    loss_fn = nn.MSELoss()
 
     progress_bar = tqdm(data_loader)
     for batch, data in enumerate(progress_bar):
-        w_i, w_o, wavelength, labels = data
-        w_i = w_i.to(device)
-        w_o = w_o.to(device)
-        wavelength = wavelength.to(device)
+        w_i, w_o, wavelengths, labels = data
+        w_i = w_i.flatten(end_dim=-2).to(device)
+        w_o = w_o.flatten(end_dim=-2).to(device)
+        wavelengths = wavelengths.to(device)
         labels = labels.to(device)
         optimizer.zero_grad()
-        value = decoder(w_i, w_o, wavelength).squeeze()
-        loss = loss_fn(value, labels)
+        value = decoder(w_i, w_o, wavelengths.flatten()).reshape((wavelengths.shape[0], wl_samples));
+
+        loss1 = F.mse_loss(value, labels)
+
+        sam = F.cosine_similarity(value, labels).mean()
+        loss2 = (1 - sam)
+
+        loss = loss1 + 0.4 * loss2
         loss.backward()
         optimizer.step()
         
         if batch % 25 == 0:
-            progress_bar.set_description(f"Batch {batch}, MSE: {loss.item():.6f}")
+            progress_bar.set_description(f"Batch {batch}, MSE loss: {loss1.item():.6f}, SAM: {sam.item():.4f}")
 
     decoder.save_raw(DECODER_RAW_PATH)
     print(decoder.decoder)
@@ -68,9 +76,8 @@ if __name__ == "__main__":
     predicted_map = np.zeros((num_angles, num_points))
 
     for i, w_i in enumerate(w_i_vectors):
+        gt_map[i, :] = film_refl(w_i, w_o, eta_i, eta_f, eta_t, thickness, wavelength_range)
         for j, wavelength in enumerate(wavelength_range):
-            gt_map[i, j] = film_refl(w_i, w_o, eta_i, eta_f, eta_t, thickness, wavelength)
-            
             with torch.no_grad():
                 predicted_map[i, j] = decoder(
                     torch.tensor(w_i, dtype=torch.float32),

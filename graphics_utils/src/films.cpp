@@ -53,7 +53,7 @@ float FrFilmRefl(float cosThetaI, complex etaI, complex etaF, complex etaT, floa
   return result / 2;
 }
 
-float film_refl(py::array_t<float> w_i_numpy, py::array_t<float> w_o_numpy, py::array_t<float> etaI_numpy, py::array_t<float> etaF_numpy, py::array_t<float>  etaT_numpy, float thickness, float lambda) 
+py::array_t<float> film_refl(py::array_t<float> w_i_numpy, py::array_t<float> w_o_numpy, py::array_t<float> etaI_numpy, py::array_t<float> etaF_numpy, py::array_t<float>  etaT_numpy, float thickness, py::array_t<float> lambdas) 
 {
   py::buffer_info w_i_info = w_i_numpy.request();
   float3* w_i = static_cast<float3*>(w_i_info.ptr);
@@ -68,7 +68,19 @@ float film_refl(py::array_t<float> w_i_numpy, py::array_t<float> w_o_numpy, py::
   float* etaT = static_cast<float*>(etaT_info.ptr);
 
   float cosThetaI = LiteMath::normalize(*w_i).z;
-  float result = FrFilmRefl(cosThetaI, complex(etaI[0], etaI[1]), complex(etaF[0], etaF[1]), complex(etaT[0], etaT[1]), thickness, lambda);
+
+  py::buffer_info lambdas_info = lambdas.request();
+  float* lambdasT = static_cast<float*>(lambdas_info.ptr);
+
+  if (lambdas_info.ndim != 1)
+    throw std::runtime_error("Number of dimensions must be one");
+
+  py::array_t<float> result(lambdas_info.size);
+  auto result_buf = result.request();
+  float* resultT = static_cast<float*>(result_buf.ptr);
+
+  for(int i = 0; i < lambdas_info.size; ++i)
+    resultT[i] = FrFilmRefl(cosThetaI, complex(etaI[0], etaI[1]), complex(etaF[0], etaF[1]), complex(etaT[0], etaT[1]), thickness, lambdasT[i]);
 
   return result;
 }
