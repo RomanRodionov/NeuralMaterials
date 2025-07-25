@@ -12,21 +12,24 @@ from dataset.materials import IridescenceDataset
 from brdf_decoder import SpectralDecoder, initialize_weights
 
 DECODER_RAW_PATH = "saved_models/spectral_decoder.bin"
+WL_MIN = 360
+WL_MAX = 830
 
 def train_decoder():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
-    samples = 25000000
-    batch_size = 2048
-    wl_samples = (830 - 360) // 10
+    samples = 10000000
+    batch_size = 1024
+    wl_samples = 128
 
-    dataset = IridescenceDataset(n_samples=samples, film_thickness=300, wl_samples=wl_samples)
-    data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=20)
+    dataset = IridescenceDataset(max_wavelength=WL_MAX, min_wavelength=WL_MIN, n_samples=samples, film_thickness=300, wl_samples=wl_samples)
+    data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=12)
 
-    decoder = SpectralDecoder(hidden_dim=24, output_dim=1).to(device)
+    decoder = SpectralDecoder(hidden_dim=16, output_dim=1, wavelength_max=WL_MAX, wavelength_min=WL_MIN).to(device)
     initialize_weights(decoder, "normal")
     optimizer = optim.Adam(decoder.parameters(), lr=1e-3)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=samples // batch_size, eta_min=1e-5)
 
     progress_bar = tqdm(data_loader)
     for batch, data in enumerate(progress_bar):
@@ -36,7 +39,7 @@ def train_decoder():
         wavelengths = wavelengths.to(device)
         labels = labels.to(device)
         optimizer.zero_grad()
-        value = decoder(w_i, w_o, wavelengths.flatten()).reshape((wavelengths.shape[0], wl_samples));
+        value = decoder(w_i, w_o, wavelengths.flatten()).reshape((wavelengths.shape[0], wl_samples))
 
         loss1 = F.mse_loss(value, labels)
 

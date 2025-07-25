@@ -100,7 +100,7 @@ def phong_demo(view_dir=(0, 0, 1), size=128):
     return image
 
 if __name__ == "__main__":
-    #decoder = train_decoder()
+    decoder = train_decoder()
 
     test()
 

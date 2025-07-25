@@ -5,7 +5,7 @@ import cv2
 import os
 import numpy as np
 from brdf_models import phong
-from graphics_utils import film_refl, principled_bsdf
+from graphics_utils import film_refl, principled_bsdf, real_fourier_moments #, procedural_bsdf
 from utils.sampling import *
 from external.compact_spectra import *
 
@@ -99,11 +99,27 @@ class PhongDataset(Dataset):
         return self.n_samples
     
     def __getitem__(self, idx):
+        sample = sample_hemisphere(2)
+        return sample[0], sample[1], phong(sample[0], sample[1])
+    
+class ProceduralDataset(Dataset):
+    def __init__(self, n_samples=1000):
+        self.n_samples = n_samples
+    
+    def __len__(self):
+        return self.n_samples
+    
+    def __getitem__(self, idx):
+        sample = torch.tensor(sample_hemisphere(2), dtype=torch.float32)
         sample = torch.tensor(sample_hemisphere(2), dtype=torch.float32)
         return sample[0], sample[1], phong(sample[0], sample[1])
 
 class IridescenceDataset(Dataset):
-    def __init__(self, min_wavelength=360, max_wavelength=830, film_thickness=300, n_samples=1000, wl_samples=67):
+    def __init__(self, min_wavelength=360, max_wavelength=830, film_thickness=550, 
+                 eta_i = np.array([1.0, 0.0], dtype=np.float32), 
+                 eta_f = np.array([1.38, 0.0], dtype=np.float32),
+                 eta_t = np.array([1.0, 0.0], dtype=np.float32),
+                 n_samples=1000, wl_samples=67):
         self.min_wavelength = min_wavelength
         self.max_wavelength = max_wavelength
         self.range = max_wavelength - min_wavelength
@@ -111,16 +127,16 @@ class IridescenceDataset(Dataset):
         self.n_samples = n_samples
         self.wl_samples = wl_samples
 
-        self.eta_i = np.array([1.0, 0.0], dtype=np.float32)
-        self.eta_f = np.array([2.0, 0.0], dtype=np.float32)
-        self.eta_t = np.array([1.5, 0.0], dtype=np.float32)
+        self.eta_i = eta_i
+        self.eta_f = eta_f
+        self.eta_t = eta_t
     
     def __len__(self):
         return self.n_samples
     
     def __getitem__(self, idx):
         samples = sample_hemisphere(2)
-        wavelengths = np.linspace(self.min_wavelength, self.max_wavelength, self.wl_samples) + np.random.rand(self.wl_samples) * (self.range / self.wl_samples) 
+        wavelengths = np.linspace(self.min_wavelength, self.max_wavelength, self.wl_samples, endpoint=False) + np.random.rand(self.wl_samples) * (self.range / self.wl_samples) 
         values = film_refl(samples[0], samples[1], self.eta_i, self.eta_f, self.eta_t, self.film_thickness, wavelengths)
 
         samples    = torch.tensor(samples, dtype=torch.float32)
@@ -128,6 +144,43 @@ class IridescenceDataset(Dataset):
         values      = torch.tensor(values, dtype=torch.float32)
 
         return samples[0].expand(self.wl_samples, -1), samples[1].expand(self.wl_samples, -1), wavelengths, values
+    
+def to_phases(wl, wl_min, wl_max):
+    return np.pi * (wl - wl_min) / (wl_max - wl_min) - np.pi
+    
+class FourierIridescenceDataset(Dataset):
+    def __init__(self, min_wavelength=360, max_wavelength=830, film_thickness=400, 
+                 eta_i = np.array([1.0, 0.0], dtype=np.float32), 
+                 eta_f = np.array([2.0, 0.0], dtype=np.float32),
+                 eta_t = np.array([1.5, 0.0], dtype=np.float32), n_samples=1000, wl_samples=300, moments=10):
+        self.min_wavelength = min_wavelength
+        self.max_wavelength = max_wavelength
+        self.range = max_wavelength - min_wavelength
+        self.film_thickness = film_thickness
+        self.n_samples = n_samples
+        self.wl_samples = wl_samples
+        self.moments = moments
+
+        self.eta_i = eta_i
+        self.eta_f = eta_f
+        self.eta_t = eta_t
+
+        self.wavelengths = np.linspace(self.min_wavelength, self.max_wavelength, self.wl_samples, endpoint=False) + 0.5 * (self.range / self.wl_samples) 
+        self.phases = to_phases(self.wavelengths, min_wavelength, max_wavelength)
+    
+    def __len__(self):
+        return self.n_samples
+    
+    def __getitem__(self, idx):
+        samples = sample_hemisphere(2) 
+        values = film_refl(samples[0], samples[1], self.eta_i, self.eta_f, self.eta_t, self.film_thickness, self.wavelengths)
+        f_values = real_fourier_moments(self.phases, values, self.moments)
+
+        samples    = torch.tensor(samples, dtype=torch.float32)
+        values   = torch.tensor(values, dtype=torch.float32)
+        f_values   = torch.tensor(f_values, dtype=torch.float32)
+
+        return samples[0], samples[1], values, f_values
 
 class MomentsDataset(Dataset):
     def __init__(self, min_wavelength=380, max_wavelength=780, film_thickness=300, n_moments=6, n_points=100, n_samples=1000):
