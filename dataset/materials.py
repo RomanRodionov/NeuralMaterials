@@ -183,17 +183,25 @@ class FourierIridescenceDataset(Dataset):
         return samples[0], samples[1], values, f_values
 
 class MomentsDataset(Dataset):
-    def __init__(self, min_wavelength=380, max_wavelength=780, film_thickness=300, n_moments=6, n_points=100, n_samples=1000):
+    def __init__(self, min_wavelength=380, max_wavelength=780, film_thickness=300,
+                 eta_i = np.array([1.0, 0.0], dtype=np.float32), 
+                 eta_f = np.array([2.0, 0.0], dtype=np.float32),
+                 eta_t = np.array([1.5, 0.0], dtype=np.float32), 
+                 wl_samples=300, n_moments=10, n_samples=1000):
         self.film_thickness = film_thickness
-        self.n_points  = n_points
         self.n_moments = n_moments
         self.n_samples = n_samples
+        self.wl_samples = wl_samples
+
+        self.eta_i = eta_i
+        self.eta_f = eta_f
+        self.eta_t = eta_t
         
         self.mirror_signal = True
         self.use_warp      = False
         self.use_lagrange  = True
     
-        self.wavelengths = np.linspace(min_wavelength, max_wavelength, n_points)
+        self.wavelengths = np.linspace(min_wavelength, max_wavelength, wl_samples)
         self.phases = WavelengthToPhase(self.wavelengths, self.wavelengths.min(), self.wavelengths.max(), self.mirror_signal, self.use_warp)
     
     def __len__(self):
@@ -212,9 +220,7 @@ class MomentsDataset(Dataset):
     def __getitem__(self, idx):
         samples = sample_hemisphere(2)
 
-        reflectance = np.zeros(self.n_points)
-        for i, wavelength in enumerate(self.wavelengths):
-            reflectance[i] = film_refl(samples[0], samples[1], self.film_thickness, wavelength)
+        reflectance = film_refl(samples[0], samples[1], self.eta_i, self.eta_f, self.eta_t, self.film_thickness, self.wavelengths)
 
         bounded_moments = ComputeTrigonometricMoments(self.phases, reflectance, self.n_moments, self.mirror_signal)
 

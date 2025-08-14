@@ -16,7 +16,7 @@ def train_decoder(dataset):
 
     batch_size = 128
     n_moments = dataset.n_moments
-    data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=20)
+    data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=12)
 
     decoder = MomentsDecoder(hidden_dim=16, output_dim=n_moments + 1).to(device)
     initialize_weights(decoder, "normal")
@@ -43,12 +43,24 @@ def train_decoder(dataset):
     return decoder.to("cpu")
 
 if __name__ == "__main__":
-    dataset = MomentsDataset(n_samples=150000, n_moments=15)
+    film_thickness=300
+    eta_i = np.array([1.0, 0.0], dtype=np.float32)
+    eta_f = np.array([2.0, 0.0], dtype=np.float32)
+    eta_t = np.array([1.5, 0.0], dtype=np.float32)
+    wl_samples=300
+    n_moments=15
+    n_samples=50000
+
+    dataset = MomentsDataset(film_thickness=film_thickness,
+                             eta_i=eta_i,
+                             eta_f=eta_f,
+                             eta_t=eta_t,
+                             wl_samples=wl_samples,
+                             n_moments=n_moments,
+                             n_samples=n_samples)
     decoder = train_decoder(dataset).cpu()
 
-    num_points = dataset.n_points
-    wavelength_range = np.linspace(380, 780, num_points)
-    thickness = 300
+    wavelengths = np.linspace(380, 780, wl_samples)
     num_angles = 50
 
     w_i_vectors = [
@@ -56,9 +68,9 @@ if __name__ == "__main__":
     ]
     w_o = (0.5, 0.0, 0.5)  # doesn't mean yet
 
-    gt_map        = np.zeros((num_angles, num_points))
-    mese_map      = np.zeros((num_angles, num_points))
-    predicted_map = np.zeros((num_angles, num_points))
+    gt_map        = np.zeros((num_angles, wl_samples))
+    mese_map      = np.zeros((num_angles, wl_samples))
+    predicted_map = np.zeros((num_angles, wl_samples))
 
     for i, w_i in enumerate(w_i_vectors):
         with torch.no_grad():
@@ -68,8 +80,8 @@ if __name__ == "__main__":
             )
             predicted_map[i] = dataset.moments_to_spectrum(predicted.numpy())
 
-        for j, wavelength in enumerate(wavelength_range):
-            gt_map[i, j] = film_refl(w_i, w_o, thickness, wavelength)
+
+        gt_map[i] = film_refl(w_i, w_o, eta_i, eta_f, eta_t, film_thickness, wavelengths)
 
         mese_map[i] = dataset.moments_to_spectrum(dataset.spectrum_to_moments(gt_map[i]))
 
