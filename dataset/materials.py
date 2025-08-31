@@ -5,7 +5,7 @@ import cv2
 import os
 import numpy as np
 from brdf_models import phong
-from graphics_utils import film_refl, principled_bsdf, real_fourier_moments #, procedural_bsdf
+from graphics_utils import film_refl, principled_bsdf, real_fourier_moments, film_brdf #, procedural_bsdf
 from utils.sampling import *
 from external.compact_spectra import *
 
@@ -178,6 +178,52 @@ class FourierIridescenceDataset(Dataset):
 
         samples    = torch.tensor(samples, dtype=torch.float32)
         values   = torch.tensor(values, dtype=torch.float32)
+        f_values   = torch.tensor(f_values, dtype=torch.float32)
+
+        return samples[0], samples[1], values, f_values
+    
+class FourierRoughFilmsDataset(Dataset):
+    def __init__(self, min_wavelength=360, max_wavelength=830, thickness=400, alpha=0.2, 
+                 eta_i = np.array([1.0, 0.0], dtype=np.float32), 
+                 eta_f = np.array([2.0, 0.0], dtype=np.float32),
+                 eta_t = np.array([1.5, 0.0], dtype=np.float32), n_samples=1000, wl_samples=300, moments=10):
+        self.min_wavelength = min_wavelength
+        self.max_wavelength = max_wavelength
+        self.range = max_wavelength - min_wavelength
+        self.film_thickness = thickness
+        self.alpha = alpha
+        self.n_samples = n_samples
+        self.wl_samples = wl_samples
+        self.moments = moments
+
+        self.eta_i = eta_i
+        self.eta_f = eta_f
+        self.eta_t = eta_t
+
+        self.wavelengths = np.linspace(self.min_wavelength, self.max_wavelength, self.wl_samples, endpoint=False) + 0.5 * (self.range / self.wl_samples) 
+        self.phases = to_phases(self.wavelengths, min_wavelength, max_wavelength)
+    
+    def __len__(self):
+        return self.n_samples
+    
+    def __getitem__(self, idx):
+        samples = sample_rusinkiewicz()
+        #samples = sample_hemisphere(2)
+        samples = samples / np.linalg.norm(samples, axis=-1, keepdims=True)
+        samples[:, -1] = np.abs(samples[:, -1])
+        #print(samples)
+        #n = np.array([0,0,1])
+        #wo_spec = 2*np.dot(samples[0], n)*n - samples[0]
+        #cos_angle = np.clip(np.dot(samples[1], wo_spec), -1.0, 1.0)
+        #angle = np.arccos(cos_angle)
+
+        normal = np.array([0, 0, 1])
+
+        values = film_brdf(samples[0], samples[1], normal, self.eta_i, self.eta_f, self.eta_t, self.film_thickness, self.alpha, self.wavelengths)
+        f_values = real_fourier_moments(self.phases, values, self.moments)
+
+        samples    = torch.tensor(samples, dtype=torch.float32)
+        values     = torch.tensor(values, dtype=torch.float32)
         f_values   = torch.tensor(f_values, dtype=torch.float32)
 
         return samples[0], samples[1], values, f_values

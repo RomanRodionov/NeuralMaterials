@@ -4,6 +4,7 @@ import torch.nn.init as init
 import torch.nn.functional as F
 import numpy as np
 import math
+from utils.encodings import RusinkiewiczTransform
 #https://research.nvidia.com/labs/rtr/neural_appearance_models/assets/nvidia_neural_materials_author_paper.pdf
 
 class LatentTexture(nn.Module):
@@ -157,26 +158,23 @@ class SpectralDecoder(nn.Module):
         self.wavelength_min = wavelength_min
         self.wavelength_max = wavelength_max
         self.range = wavelength_max - wavelength_min
+
+        self.encoder = RusinkiewiczTransform()
         
         self.decoder = nn.Sequential(
-            nn.Linear(3, hidden_dim),
+            nn.Linear(4, hidden_dim),
+            Sin(),
+            nn.Linear(hidden_dim, hidden_dim),
             Sin(),
             nn.Linear(hidden_dim, output_dim),
             nn.ReLU(inplace=True)
         )
 
     def forward(self, w_i, w_o, wavelength):
-        #v = self.vectors_encoder(torch.cat([w_i, w_o], dim=-1))
-        #w = self.wavelength_encoder(wavelength.unsqueeze(-1))
         w = (wavelength - self.wavelength_min) / self.range
-        w_i = w_i[..., 2] / torch.norm(w_i, dim=-1)
-        w_o = w_o[..., 2] / torch.norm(w_o, dim=-1)
-
-        #angles_tensor = torch.tensor([w_i, w_o]).to(self.device)
-
-        z = torch.cat([w_i.unsqueeze(-1), w_o.unsqueeze(-1), w.unsqueeze(-1)], dim=-1)
-
+        z = torch.cat([self.encoder(w_i, w_o) , w.unsqueeze(-1)], dim=-1)
         z = self.decoder(z)
+
         return z
         
     def save_raw(self, path):
@@ -210,21 +208,24 @@ class FSpectralDecoder(nn.Module):
         self.wavelength_min = wavelength_min
         self.wavelength_max = wavelength_max
         self.range = wavelength_max - wavelength_min
-        
+
+        self.encoder = RusinkiewiczTransform()
+
         self.decoder = nn.Sequential(
-            nn.Linear(1, hidden_dim),
-            Sin(trainable=False),
+            nn.Linear(6, hidden_dim),
+            nn.ReLU(),
             nn.Linear(hidden_dim, hidden_dim),
-            Sin(trainable=False),
-            nn.Linear(hidden_dim, output_dim)
+            nn.ReLU(),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, 64),
+            nn.ReLU(),
+            nn.Linear(64, output_dim)
         )
 
     def forward(self, w_i, w_o):
-        w_i = w_i[..., 2] / torch.norm(w_i, dim=-1)
-        w_o = w_o[..., 2] / torch.norm(w_o, dim=-1)
-
-        z = torch.cat([w_i.unsqueeze(-1)], dim=-1)
-        z = self.decoder(z)
+        z = self.encoder(w_i, w_o)
+        z = self.decoder(z)# / w_i[..., -1].unsqueeze(-1)
         return z
         
     def save_raw(self, path):

@@ -6,3 +6,4 @@
 namespace py = pybind11;
 
 py::array_t<float> film_refl(py::array_t<float> w_i_numpy, py::array_t<float> w_o_numpy, py::array_t<float> etaI_numpy, py::array_t<float> etaF_numpy, py::array_t<float>  etaT_numpy, float thickness, py::array_t<float> lambda);
+py::array_t<float> film_brdf(py::array_t<float> w_i_numpy, py::array_t<float> w_o_numpy, py::array_t<float> w_n_numpy, py::array_t<float> etaI_numpy, py::array_t<float> etaF_numpy, py::array_t<float>  etaT_numpy, float thickness, float alpha, py::array_t<float> lambdas);

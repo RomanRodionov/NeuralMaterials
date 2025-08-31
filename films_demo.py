@@ -28,7 +28,7 @@ def train_decoder():
 
     decoder = SpectralDecoder(hidden_dim=16, output_dim=1, wavelength_max=WL_MAX, wavelength_min=WL_MIN).to(device)
     initialize_weights(decoder, "normal")
-    optimizer = optim.Adam(decoder.parameters(), lr=1e-3)
+    optimizer = optim.Adam(decoder.parameters(), lr=1e-2)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=samples // batch_size, eta_min=1e-5)
 
     progress_bar = tqdm(data_loader)
@@ -49,6 +49,7 @@ def train_decoder():
         loss = loss1 + 0.02 * loss2
         loss.backward()
         optimizer.step()
+        scheduler.step()
         
         if batch % 25 == 0:
             progress_bar.set_description(f"Batch {batch}, MSE loss: {loss1.item():.6f}, SAM: {sam.item():.4f}")

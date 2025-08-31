@@ -35,6 +35,7 @@ PYBIND11_MODULE(graphics_utils, m) {
     m.doc() = "Backend for intensive graphics routine";
     m.def("real_fourier_moments",    &real_fourier_moments,    "Calculate fourier moments of spectrum");
     m.def("film_refl",       &film_refl,       "Calculate reflection intensity for thin film");
+    m.def("film_brdf",       &film_brdf,       "Calculate Cook-Torrance BRDF model with iridescence");
     m.def("principled_bsdf", &principled_bsdf, "Calculate BSDF for principled material"      );
     //m.def("procedural_bsdf", &procedural_bsdf, "Calculate BSDF for procedural material"      );
 }
