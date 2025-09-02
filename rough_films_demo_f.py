@@ -67,9 +67,9 @@ def train_decoder():
     optimizer = optim.Adam(decoder.parameters(),  
                            lr=5e-4,
                            betas=(0.9, 0.999),
-                            eps=1e-15,  # eps=None raises error
-                            weight_decay=0.0,
-                            amsgrad=False)
+                           eps=1e-15,
+                           weight_decay=0.0,
+                           amsgrad=False)
     #scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=samples // batch_size, eta_min=5e-4)
 
     progress_bar = tqdm(data_loader)
@@ -100,7 +100,7 @@ def train_decoder():
 
         loss3 = (1 - sam)
 
-        loss = loss1 + 0.1 * loss2 + 0.02 * loss3
+        loss = 0.9 * loss1 + 0.1 * loss2 + 0.05 * loss3
         loss.backward()
         optimizer.step()
         #scheduler.step()
@@ -119,7 +119,7 @@ if __name__ == "__main__":
     num_points = 100
     wavelength_range = np.linspace(WL_MIN, WL_MAX, num_points, endpoint=False)
     thickness = 400
-    alpha=0.2
+    alpha=0.25
     num_angles = 50
 
     wavelengths = np.linspace(WL_MIN, WL_MAX, num_points, endpoint=False) + 0.5 * (wavelength_range / num_points) 
@@ -140,9 +140,8 @@ if __name__ == "__main__":
     predicted_map = np.zeros((num_angles, num_points))
 
     for i, w_i in enumerate(w_i_vectors):
-        w_o = torch.tensor(w_i)
+        w_o = w_i.copy()
         w_o[0] = -w_o[0]
-        #print(w_i, w_o)
         with torch.no_grad():
             predicted = decoder(
                 torch.tensor(w_i, dtype=torch.float32),
@@ -156,7 +155,7 @@ if __name__ == "__main__":
         mese_map[i] = real_fourier_series(phases, real_fourier_moments(phases, gt_map[i], MOMENTS))
 
 
-    norm = colors.Normalize(vmin=0.0, vmax=25.0)
+    norm = colors.Normalize(vmin=0.0, vmax=50.0)
 
     # 2. Choose a blue-green colormap, e.g. "viridis" or "Blues"
     cmap = "Spectral_r"

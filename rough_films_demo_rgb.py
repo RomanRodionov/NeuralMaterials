@@ -31,9 +31,9 @@ def train_decoder():
     initialize_weights(decoder, "uniform")
     optimizer = optim.Adam(decoder.parameters(), lr=5e-4,
                            betas=(0.9, 0.999),
-                         eps=1e-15,  # eps=None raises error
-                         weight_decay=0.0,
-                         amsgrad=False)
+                           eps=1e-15,
+                           weight_decay=0.0,
+                           amsgrad=False)
     #scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=samples // batch_size, eta_min=5e-4)
 
     progress_bar = tqdm(data_loader)
@@ -90,7 +90,7 @@ if __name__ == "__main__":
     predicted_map = np.zeros((num_angles, num_points))
 
     for i, w_i in enumerate(w_i_vectors):
-        w_o = torch.tensor(w_i)
+        w_o = w_i.copy()
         w_o[0] = -w_o[0]
         #print(w_i, w_o)
         with torch.no_grad():
