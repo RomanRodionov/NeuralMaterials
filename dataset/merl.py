@@ -33,13 +33,15 @@ class MerlDataset(Dataset):
         return self.n_samples
     
     def __getitem__(self, idx):
-        theta_h, phi_h, theta_d, phi_d = np.random.uniform([0, 0, 0, 0], [np.pi / 2., 2 * np.pi, np.pi / 2., 2 * np.pi])
+        theta_h, phi_h, theta_d, phi_d = np.random.uniform([0, 0, 0, 0], [1., 2 * np.pi, np.pi / 2., 2 * np.pi])
+
+        theta_h = (theta_h) * np.pi / 2
 
         trunc_phi_d = np.where(phi_d > np.pi, phi_d - np.pi, phi_d)
         values = self.data_object.eval_interp(theta_h, theta_d, trunc_phi_d)
         values = np.where(values < 0, 0, values)
 
-        print(f"theta_h: {theta_h}, theta_d: {theta_d}, phi_d: {phi_d}, trunc_phi_d: {trunc_phi_d}, BRDF: {values}\n")
+        #print(f"theta_h: {theta_h}, theta_d: {theta_d}, phi_d: {phi_d}, trunc_phi_d: {trunc_phi_d}, BRDF: {values}\n")
 
         half = torch.tensor(sph2xyz(theta_h, phi_h), dtype=torch.float32)
         diff = torch.tensor(sph2xyz(theta_d, phi_d), dtype=torch.float32)

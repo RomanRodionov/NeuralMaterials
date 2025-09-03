@@ -261,11 +261,14 @@ class NBRDFDecoder(nn.Module):
             nn.Linear(hidden_dim, output_dim)
         )
 
-    def forward(self, w_i, w_o):
+    def forward(self, w_i, w_o=None):
         if self.encoder:
             z = self.encoder(w_i, w_o)
         else:
-            z = torch.cat([w_i, w_o], dim=-1)
+            if w_o is not None:
+                z = torch.cat([w_i, w_o], dim=-1)
+            else:
+                z = w_i
         z = self.decoder(z)
         res = F.relu(torch.exp(z) - 1)
         if self.scale is not None:
@@ -322,7 +325,7 @@ def initialize_weights(model, init_type="xavier_uniform"):
             elif init_type == "normal":
                 init.normal_(layer.weight, mean=0.0, std=0.02)
             elif init_type == "uniform":
-                init.uniform_(layer.weight, a=-0.1, b=0.1)
+                init.uniform_(layer.weight, a=-0.05, b=0.05)
             else:
                 raise ValueError(f"Unknown init_type: {init_type}")
             

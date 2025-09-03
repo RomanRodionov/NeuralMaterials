@@ -12,6 +12,14 @@ def sph2xyz(theta, phi, r=1):
 	z = r*np.cos(theta)
 	return np.array([x, y, z])
 
+def xyz2sph_numpy(v):
+    x, y, z = v[0], v[1], v[2]
+    r2_xy = x**2 + y**2
+    r = np.sqrt(r2_xy + z**2)
+    theta = np.arctan2(np.sqrt(r2_xy), z)
+    phi = np.arctan2(y, x)
+    return [r, theta, phi]
+
 def sample_rusinkiewicz(lobe_degree=1):
     # Sample half-angle (theta_h) and difference (theta_d) angles
     theta_h = np.arccos(np.random.rand()**(1/lobe_degree))

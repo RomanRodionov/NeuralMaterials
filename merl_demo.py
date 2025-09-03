@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from matplotlib import colors
 from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
-from dataset.merl import MerlDataset
+from external.merl.dataset import MerlDataset, brdf_to_rgb
 from brdf_decoder import NBRDFDecoder, initialize_weights
 from utils.encodings import Rusinkiewicz6DTransform
 
@@ -21,11 +21,11 @@ def train_decoder():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
-    samples = 500000
+    #samples = 5000000
     batch_size = 2048
+    epochs = 100
 
-    dataset = MerlDataset(filename="./external/merl/BRDFDatabase/brdfs/nylon.binary", n_samples=samples)
-    data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=12)
+    dataset = MerlDataset(merlPath="./external/merl/BRDFDatabase/brdfs/orange-paint.binary", batchsize=batch_size)
 
     decoder = NBRDFDecoder(hidden_dim=21, encoder=False).to(device)
     initialize_weights(decoder, "uniform")
@@ -34,31 +34,30 @@ def train_decoder():
                            eps=1e-15,
                            weight_decay=0.0,
                            amsgrad=False)
-    #scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=samples // batch_size, eta_min=5e-4)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs, eta_min=5e-5)
 
-    progress_bar = tqdm(data_loader)
-    for batch, data in enumerate(progress_bar):
-        h, d, labels = data
-        h = h.flatten(end_dim=-2).to(device)
-        d = d.flatten(end_dim=-2).to(device)
-        #theta_i = theta_i.to(device)
-        labels = labels.to(device)
-        optimizer.zero_grad()
-        value = decoder(h, d)
+    for epoch in range(epochs):
+        dataset.shuffle()
+        num_batches = int(dataset.train_samples.shape[0] / batch_size)
+        progress_bar = tqdm(range(num_batches))
 
-        #value = value*theta_i.unsqueeze(-1)
-        #labels = labels*theta_i.unsqueeze(-1)
+        for batch in progress_bar:
 
-        #loss1 = mean_absolute_logarithmic_error(value, labels)
-        loss1 = F.l1_loss(value, labels)
+            optimizer.zero_grad()
 
-        loss = loss1
-        loss.backward()
-        optimizer.step()
-        #scheduler.step()
-        
-        if batch % 25 == 0:
-            progress_bar.set_description(f"Batch {batch}, MSE loss: {loss1.item():.6f}")
+            mlp_input, groundTruth = dataset.get_trainbatch(batch * dataset.bs)
+            output = decoder(mlp_input).to(device)
+
+            rgb_pred = brdf_to_rgb(mlp_input, output)
+            rgb_true = brdf_to_rgb(mlp_input, groundTruth)
+
+            loss = mean_absolute_logarithmic_error(y_true=rgb_true, y_pred=rgb_pred)
+            loss.backward()
+            optimizer.step()
+
+            if batch % 25 == 0:
+                progress_bar.set_description(f"Batch {batch}, MSE loss: {loss.item():.6f}")
+        scheduler.step()
 
     decoder.save_raw(DECODER_RAW_PATH)
     print(decoder.decoder)
@@ -109,7 +108,7 @@ if __name__ == "__main__":
             predicted_map2[i] = predicted.numpy()
 
 
-    norm = colors.Normalize(vmin=0.0, vmax=25.0)
+    norm = colors.Normalize(vmin=0.0, vmax=1000.0)
 
     cmap = "Spectral_r"
 
