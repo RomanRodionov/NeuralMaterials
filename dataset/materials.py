@@ -184,7 +184,7 @@ class FourierIridescenceDataset(Dataset):
     
 
 class RoughFilmsDataset(Dataset):
-    def __init__(self, thickness=400, alpha=0.25, 
+    def __init__(self, thickness=400, alpha=0.5, 
                  eta_i = np.array([1.0, 0.0], dtype=np.float32), 
                  eta_f = np.array([2.0, 0.0], dtype=np.float32),
                  eta_t = np.array([1.5, 0.0], dtype=np.float32), n_samples=1000):

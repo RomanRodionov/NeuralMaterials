@@ -1,8 +1,16 @@
 import numpy as np
 from numpy.random import randn
 
-import numpy as np
+def sample_hemisphere_angles():
+    theta = 0.5 * np.pi * np.random.rand()
+    phi   = 2 * np.pi * np.random.rand()
+    return theta, phi
 
+def sph2xyz(theta, phi, r=1):
+	x = r*np.sin(theta)*np.cos(phi)
+	y = r*np.sin(theta)*np.sin(phi)
+	z = r*np.cos(theta)
+	return np.array([x, y, z])
 
 def sample_rusinkiewicz(lobe_degree=1):
     # Sample half-angle (theta_h) and difference (theta_d) angles

@@ -243,10 +243,15 @@ class FSpectralDecoder(nn.Module):
                 f.write(bias.tobytes())
 
 class NBRDFDecoder(nn.Module):
-    def __init__(self, hidden_dim=21, output_dim=3):
+    def __init__(self, hidden_dim=21, output_dim=3, encoder=True, scale=None):
         super(NBRDFDecoder, self).__init__()
 
-        self.encoder = Rusinkiewicz6DTransform()
+        if encoder:
+            self.encoder = Rusinkiewicz6DTransform()
+        else:
+            self.encoder = None
+
+        self.scale = scale
 
         self.decoder = nn.Sequential(
             nn.Linear(6, hidden_dim),
@@ -257,9 +262,15 @@ class NBRDFDecoder(nn.Module):
         )
 
     def forward(self, w_i, w_o):
-        z = self.encoder(w_i, w_o)
+        if self.encoder:
+            z = self.encoder(w_i, w_o)
+        else:
+            z = torch.cat([w_i, w_o], dim=-1)
         z = self.decoder(z)
-        return F.relu(torch.exp(z) - 1)
+        res = F.relu(torch.exp(z) - 1)
+        if self.scale is not None:
+            res = res / self.scale
+        return res
         
     def save_raw(self, path):
         with open(path, "wb") as f:
@@ -311,7 +322,7 @@ def initialize_weights(model, init_type="xavier_uniform"):
             elif init_type == "normal":
                 init.normal_(layer.weight, mean=0.0, std=0.02)
             elif init_type == "uniform":
-                init.uniform_(layer.weight, a=-0.05, b=0.05)
+                init.uniform_(layer.weight, a=-0.1, b=0.1)
             else:
                 raise ValueError(f"Unknown init_type: {init_type}")
             

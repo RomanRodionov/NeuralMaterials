@@ -1,4 +1,5 @@
 import torch
+import torch.nn.functional as F
 
 def rotate_vector(v: torch.Tensor, axis: torch.Tensor, angle: torch.Tensor):
     axis_unit = axis / axis.norm(dim=-1, keepdim=True)
@@ -19,3 +20,20 @@ def xyz2sph(v: torch.Tensor):
     theta = torch.atan2(torch.sqrt(r_xy2), z)
     phi = torch.atan2(y, x)
     return torch.stack((r, theta, phi), dim=-1)
+
+
+def hd_to_io(half: torch.Tensor, diff: torch.Tensor):
+    sph = xyz2sph(half)
+    theta_h, phi_h = sph[..., 1], sph[..., 2]
+
+    y_axis = torch.tensor([0.0, 1.0, 0.0], dtype=half.dtype, device=half.device)
+    z_axis = torch.tensor([0.0, 0.0, 1.0], dtype=half.dtype, device=half.device)
+
+    tmp = rotate_vector(diff, y_axis.expand_as(diff), theta_h)
+    wi = rotate_vector(tmp, z_axis.expand_as(diff), phi_h)
+    wi = F.normalize(wi, p=2, dim=-1)
+
+    dot_wi_h = torch.sum(wi * half, dim=-1, keepdim=True)
+    wo = F.normalize(2.0 * dot_wi_h * half - wi, p=2, dim=-1)
+
+    return wi, wo
