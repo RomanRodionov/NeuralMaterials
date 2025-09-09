@@ -2,17 +2,19 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
+import time
 
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import colors
 from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
-from external.merl.dataset import MerlDataset, brdf_to_rgb
-from brdf_decoder import NBRDFDecoder, initialize_weights
+from external.merl.dataset import MerlDataset, brdf_to_rgb, brdf_to_rgb_, fastmerl, brdf_values
+from brdf_decoder import NBRDFDecoder, KAN_BRDF, initialize_weights
 from utils.encodings import Rusinkiewicz6DTransform
 
 DECODER_RAW_PATH = "saved_models/rgb_decoder.bin"
+merlPath = "./external/merl/BRDFDatabase/brdfs/red-metallic-paint.binary"
 
 def mean_absolute_logarithmic_error(y_true, y_pred):
     return torch.mean(torch.abs(torch.log(1 + y_true) - torch.log(1 + y_pred)))
@@ -23,13 +25,14 @@ def train_decoder():
 
     #samples = 5000000
     batch_size = 2048
-    epochs = 100
+    epochs = 60
 
-    dataset = MerlDataset(merlPath="./external/merl/BRDFDatabase/brdfs/orange-paint.binary", batchsize=batch_size)
+    dataset = MerlDataset(merlPath=merlPath, batchsize=batch_size, nsamples=800000)
 
-    decoder = NBRDFDecoder(hidden_dim=21, encoder=False).to(device)
-    initialize_weights(decoder, "uniform")
-    optimizer = optim.Adam(decoder.parameters(), lr=5e-4,
+    #decoder = NBRDFDecoder(hidden_dim=21, encoder=False).to(device)
+    decoder = KAN_BRDF(dim=[6, 6, 6, 3], k=3, nCps=10, encoder=False).to(device)
+    #initialize_weights(decoder, "uniform")
+    optimizer = optim.AdamW(decoder.parameters(), lr=1e-3,
                            betas=(0.9, 0.999),
                            eps=1e-15,
                            weight_decay=0.0,
@@ -38,28 +41,65 @@ def train_decoder():
 
     for epoch in range(epochs):
         dataset.shuffle()
-        num_batches = int(dataset.train_samples.shape[0] / batch_size)
-        progress_bar = tqdm(range(num_batches))
 
-        for batch in progress_bar:
+        train_loss = [] 
+        val_loss = []
+
+        train_batches = int(dataset.train_samples.shape[0] / batch_size)
+        train_progress = tqdm(range(train_batches), leave=False)
+        for batch in train_progress:
 
             optimizer.zero_grad()
 
-            mlp_input, groundTruth = dataset.get_trainbatch(batch * dataset.bs)
-            output = decoder(mlp_input).to(device)
+            train_input, train_gt = dataset.get_trainbatch(batch * dataset.bs)
 
-            rgb_pred = brdf_to_rgb(mlp_input, output)
-            rgb_true = brdf_to_rgb(mlp_input, groundTruth)
+            output = decoder(train_input)
+
+            rgb_pred = brdf_to_rgb(train_input, output)
+            rgb_true = brdf_to_rgb(train_input, train_gt)
 
             loss = mean_absolute_logarithmic_error(y_true=rgb_true, y_pred=rgb_pred)
             loss.backward()
             optimizer.step()
 
-            if batch % 25 == 0:
-                progress_bar.set_description(f"Batch {batch}, MSE loss: {loss.item():.6f}")
-        scheduler.step()
+            train_loss.append(loss.item())
 
-    decoder.save_raw(DECODER_RAW_PATH)
+            if batch % 25 == 0:
+                train_progress.set_description(f"Epoch {epoch}, Batch {batch}, Train loss: {loss.item():.6f}")
+        
+        print(f"Epoch {epoch}, Train loss: {sum(train_loss)/len(train_loss):.6f}")
+
+        scheduler.step()
+        batch_time = []
+
+        with torch.no_grad():
+            val_batches = int(dataset.test_samples.shape[0] / batch_size)
+            val_progress = tqdm(range(val_batches), leave=False)
+            for batch in val_progress:
+
+                val_input, val_gt = dataset.get_testbatch(batch * dataset.bs)
+
+                torch.cuda.synchronize()
+                start_time = time.time()
+
+                output = decoder(val_input)
+
+                torch.cuda.synchronize()
+                batch_time.append(time.time() - start_time)
+
+                rgb_pred = brdf_to_rgb(val_input, output)
+                rgb_true = brdf_to_rgb(val_input, val_gt)
+
+                loss = mean_absolute_logarithmic_error(y_true=rgb_true, y_pred=rgb_pred)
+
+                val_loss.append(loss.item())
+
+                if batch % 25 == 0:
+                    val_progress.set_description(f"Epoch {epoch}, Batch {batch}, Test loss: {loss.item():.6f}")
+        
+            print(f"Epoch {epoch}, Test loss: {sum(val_loss)/len(val_loss):.6f}, Batch time: {sum(batch_time)/len(batch_time):.6f}")
+
+    #decoder.save_raw(DECODER_RAW_PATH)
     print(decoder.decoder)
     
     return decoder.to("cpu")
@@ -72,43 +112,35 @@ if __name__ == "__main__":
     num_points = 3
     num_angles = 50
 
-    w_i_vectors1 = np.array([
+    w_i_vectors = np.array([
         (np.cos(theta), 0.0, np.sin(theta)) for theta in np.linspace(0, np.pi / 2, num_angles)
-    ])
-
-    w_i_vectors2 = np.array([
-        (0.0, -np.cos(theta), np.sin(theta)) for theta in np.linspace(0, np.pi / 2, num_angles)
-    ])
+    ])[1:]
 
     normal = np.array([0, 0, 1], dtype=np.float32)
 
     predicted_map1 = np.zeros((num_angles, num_points))
     predicted_map2 = np.zeros((num_angles, num_points))
 
-    for i, w_i in enumerate(w_i_vectors1):
+    for i, w_i in enumerate(w_i_vectors):
         w_o = w_i.copy()
         w_o[0] = -w_o[0]
-        #print(w_i, w_o)
         with torch.no_grad():
             predicted = decoder(
-                torch.tensor(w_i, dtype=torch.float32),
-                torch.tensor(w_o, dtype=torch.float32)
+                torch.tensor(w_i[np.newaxis, :], dtype=torch.float32),
+                torch.tensor(w_o[np.newaxis, :], dtype=torch.float32)
             )
-            predicted_map1[i] = predicted.numpy()
+            predicted_map1[i] = np.log(predicted.numpy())
 
-    for i, w_i in enumerate(w_i_vectors2):
+    BRDF = fastmerl.Merl(merlPath)
+    for i, w_i in enumerate(w_i_vectors):
         w_o = w_i.copy()
-        w_o[1] = -w_o[1]
-        #print(w_i, w_o)
+        w_o[0] = -w_o[0]
+        rvectors = decoder.encoder(torch.tensor(w_i), torch.tensor(w_o)).unsqueeze(-1)
+        brdf_vals = brdf_values(rvectors, brdf=BRDF)
         with torch.no_grad():
-            predicted = decoder(
-                torch.tensor(w_i, dtype=torch.float32),
-                torch.tensor(w_o, dtype=torch.float32)
-            )
-            predicted_map2[i] = predicted.numpy()
+            predicted_map2[i] = np.log(brdf_vals)
 
-
-    norm = colors.Normalize(vmin=0.0, vmax=1000.0)
+    norm = colors.Normalize(vmin=0.0, vmax=np.max(np.array([predicted_map1, predicted_map2])))
 
     cmap = "Spectral_r"
 
@@ -128,13 +160,13 @@ if __name__ == "__main__":
     # 4. Plot each with shared norm
     im1 = axs[0].imshow(predicted_map1, aspect='auto', cmap=cmap, norm=norm,
                         extent=[380, 780, 0, 90])
-    axs[0].set_title("Предсказанный спектр")
+    axs[0].set_title("NBRDF")
     axs[0].set_xlabel("Длина волны (нм)")
     axs[0].set_ylabel("Угол наблюдения (°)")
 
     im2 = axs[1].imshow(predicted_map2, aspect='auto', cmap=cmap, norm=norm,
                         extent=[380, 780, 0, 90])
-    axs[1].set_title("Предсказанный спектр")
+    axs[1].set_title("GT")
     axs[1].set_xlabel("Длина волны (нм)")
     axs[1].set_ylabel("Угол наблюдения (°)")
 

@@ -8,6 +8,7 @@ from torch.utils.data import Dataset
 
 torch.set_default_dtype(torch.float32)
 Xvars = ['hx', 'hy', 'hz', 'dx', 'dy', 'dz']
+Xvars_ = ['theta_h', 'theta_d', 'phi_d']
 Yvars = ['brdf_r', 'brdf_g', 'brdf_b']
 device = 'cuda'
 
@@ -28,19 +29,24 @@ def brdf_to_rgb(rvectors, brdf):
     return rgb
 
 class MerlDataset(Dataset):
-    def __init__(self, merlPath, batchsize):
+    def __init__(self, merlPath, batchsize, nsamples=800000, angles=False):
         super(MerlDataset, self).__init__()
 
         self.bs = batchsize
         self.BRDF = fastmerl.Merl(merlPath)
 
-        self.reflectance_train = generate_nn_datasets(self.BRDF, nsamples=800000, pct=0.8)
-        self.reflectance_test = generate_nn_datasets(self.BRDF, nsamples=800000, pct=0.2)
+        if angles:
+            xvars=Xvars_
+        else:
+            xvars=Xvars
 
-        self.train_samples = torch.tensor(self.reflectance_train[Xvars].values, dtype=torch.float32, device=device)
+        self.reflectance_train = generate_nn_datasets(self.BRDF, nsamples=nsamples, pct=0.8, angles=angles)
+        self.reflectance_test = generate_nn_datasets(self.BRDF, nsamples=nsamples, pct=0.2, angles=angles)
+
+        self.train_samples = torch.tensor(self.reflectance_train[xvars].values, dtype=torch.float32, device=device)
         self.train_gt = torch.tensor(self.reflectance_train[Yvars].values, dtype=torch.float32, device=device)
 
-        self.test_samples = torch.tensor(self.reflectance_test[Xvars].values, dtype=torch.float32, device=device)
+        self.test_samples = torch.tensor(self.reflectance_test[xvars].values, dtype=torch.float32, device=device)
         self.test_gt = torch.tensor(self.reflectance_test[Yvars].values, dtype=torch.float32, device=device)
 
     def __len__(self):
@@ -77,6 +83,15 @@ def brdf_to_rgb(rvectors, brdf):
     rgb = brdf * torch.clamp(wiz, 0, 1)
     return rgb
 
+def brdf_to_rgb_(rvectors, brdf):
+    theta_h = torch.reshape(rvectors[:, 0], (-1, 1))
+    theta_d = torch.reshape(rvectors[:, 1], (-1, 1))
+    phi_d = torch.reshape(rvectors[:, 2], (-1, 1))
+
+    wiz = torch.cos(theta_d) * torch.cos(theta_h) - \
+          torch.sin(theta_d) * torch.cos(phi_d) * torch.sin(theta_h)
+    rgb = brdf * torch.clamp(wiz, 0, 1)
+    return rgb
 
 def brdf_values(rvectors, brdf=None, model=None):
     if brdf is not None:
@@ -91,14 +106,17 @@ def brdf_values(rvectors, brdf=None, model=None):
     return brdf_arr
 
 
-def generate_nn_datasets(brdf, nsamples=800000, pct=0.8):
+def generate_nn_datasets(brdf, nsamples=800000, pct=0.8, angles=False):
     rangles = np.random.uniform([0, 0, 0], [np.pi / 2., np.pi / 2., 2 * np.pi], [int(nsamples * pct), 3]).T
     rangles[2] = common.normalize_phid(rangles[2])
 
     rvectors = coords.rangles_to_rvectors(*rangles)
     brdf_vals = brdf_values(rvectors, brdf=brdf)
 
-    df = pd.DataFrame(np.concatenate([rvectors.T, brdf_vals], axis=1), columns=[*Xvars, *Yvars])
+    if angles:
+        df = pd.DataFrame(np.concatenate([rangles.T, brdf_vals], axis=1), columns=[*Xvars_, *Yvars])
+    else:
+        df = pd.DataFrame(np.concatenate([rvectors.T, brdf_vals], axis=1), columns=[*Xvars, *Yvars])
     df = df[(df.T != 0).any()]
     df = df.drop(df[df['brdf_r'] < 0].index)
     return df

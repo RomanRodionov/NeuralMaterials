@@ -2,6 +2,9 @@ import torch
 import torch.nn as nn
 import torch.nn.init as init
 import torch.nn.functional as F
+#from torch_kan.kan import KAN
+from fastkan import FastKANORG as KAN
+#from fasterkan import FasterKAN as KAN
 import numpy as np
 import math
 from utils.encodings import RusinkiewiczTransform, Rusinkiewicz6DTransform
@@ -288,6 +291,32 @@ class NBRDFDecoder(nn.Module):
                 f.write(weight.shape[1].to_bytes(4, "little"))
                 f.write(weight.tobytes())
                 f.write(bias.tobytes())
+
+class KAN_BRDF(nn.Module):
+    def __init__(self, dim, k=1, nCps=4, encoder=True):
+        super(KAN_BRDF, self).__init__()
+
+        if encoder:
+            self.encoder = Rusinkiewicz6DTransform()
+        else:
+            self.encoder = None
+
+        #self.decoder = KAN(dim, k, nCps)
+        self.decoder = KAN(dim, num_grids=nCps, grid_max=1., grid_min=-1., base_activation=F.tanh)
+
+    def forward(self, w_i, w_o=None):
+        if self.encoder:
+            z = self.encoder(w_i, w_o)
+        else:
+            if w_o is not None:
+                z = torch.cat([w_i, w_o], dim=-1)
+            else:
+                z = w_i
+        #z = z / torch.tensor([[torch.pi / 2., torch.pi / 2., 2 * torch.pi]]).to(w_i.device)
+        #z = torch.clamp(z, 0., 1.)
+        z = self.decoder(z)
+        res = F.relu(torch.exp(z) - 1)
+        return res
     
 class MomentsDecoder(nn.Module):
     def __init__(self, hidden_dim=16, output_dim=6):
