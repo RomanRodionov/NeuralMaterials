@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 import time
+from torch.profiler import profile, record_function, ProfilerActivity
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -12,9 +13,15 @@ from tqdm.auto import tqdm
 from external.merl.dataset import MerlDataset, brdf_to_rgb, brdf_to_rgb_, fastmerl, brdf_values
 from brdf_decoder import NBRDFDecoder, KAN_BRDF, initialize_weights
 from utils.encodings import Rusinkiewicz6DTransform
+from utils.torch_utils import total_parameters
 
 DECODER_RAW_PATH = "saved_models/rgb_decoder.bin"
 merlPath = "./external/merl/BRDFDatabase/brdfs/red-metallic-paint.binary"
+PROFILE_INFERENCE = True
+
+
+TRAIN_BS = 512
+VAL_BS = 50000
 
 def mean_absolute_logarithmic_error(y_true, y_pred):
     return torch.mean(torch.abs(torch.log(1 + y_true) - torch.log(1 + y_pred)))
@@ -24,14 +31,13 @@ def train_decoder():
     print(f"Using device: {device}")
 
     #samples = 5000000
-    batch_size = 2048
-    epochs = 60
+    epochs = 100
 
-    dataset = MerlDataset(merlPath=merlPath, batchsize=batch_size, nsamples=800000)
+    dataset = MerlDataset(merlPath=merlPath, batchsize=TRAIN_BS, nsamples=800000, train_size=0.75, test_batchsize=VAL_BS, angles=True)
 
-    #decoder = NBRDFDecoder(hidden_dim=21, encoder=False).to(device)
-    decoder = KAN_BRDF(dim=[6, 6, 6, 3], k=3, nCps=10, encoder=False).to(device)
-    #initialize_weights(decoder, "uniform")
+    #decoder = NBRDFDecoder(hidden_dim=64, encoder=False).to(device)
+    decoder = KAN_BRDF(dim=[3, 2, 3], k=1, nCps=8, encoder=False).to(device)
+    initialize_weights(decoder, "xavier_uniform")
     optimizer = optim.AdamW(decoder.parameters(), lr=1e-3,
                            betas=(0.9, 0.999),
                            eps=1e-15,
@@ -39,24 +45,30 @@ def train_decoder():
                            amsgrad=False)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs, eta_min=5e-5)
 
-    for epoch in range(epochs):
+    train_batches = int(dataset.train_samples.shape[0] / dataset.train_bs)
+    val_batches = int(dataset.test_samples.shape[0] / dataset.test_bs)
+
+    params_count = total_parameters(decoder)
+    print(f"Model has {params_count} parameters")
+    
+    progress_bar = tqdm(range(epochs), leave=True)
+    for epoch in progress_bar:
         dataset.shuffle()
 
         train_loss = [] 
         val_loss = []
+        val_time = []
 
-        train_batches = int(dataset.train_samples.shape[0] / batch_size)
-        train_progress = tqdm(range(train_batches), leave=False)
-        for batch in train_progress:
+        for batch in range(train_batches):
 
             optimizer.zero_grad()
 
-            train_input, train_gt = dataset.get_trainbatch(batch * dataset.bs)
+            train_input, train_gt = dataset.get_trainbatch(batch * dataset.train_bs)
 
             output = decoder(train_input)
 
-            rgb_pred = brdf_to_rgb(train_input, output)
-            rgb_true = brdf_to_rgb(train_input, train_gt)
+            rgb_pred = brdf_to_rgb_(train_input, output)
+            rgb_true = brdf_to_rgb_(train_input, train_gt)
 
             loss = mean_absolute_logarithmic_error(y_true=rgb_true, y_pred=rgb_pred)
             loss.backward()
@@ -64,40 +76,51 @@ def train_decoder():
 
             train_loss.append(loss.item())
 
-            if batch % 25 == 0:
-                train_progress.set_description(f"Epoch {epoch}, Batch {batch}, Train loss: {loss.item():.6f}")
-        
-        print(f"Epoch {epoch}, Train loss: {sum(train_loss)/len(train_loss):.6f}")
-
         scheduler.step()
-        batch_time = []
 
         with torch.no_grad():
-            val_batches = int(dataset.test_samples.shape[0] / batch_size)
-            val_progress = tqdm(range(val_batches), leave=False)
-            for batch in val_progress:
+            for batch in range(val_batches):
 
-                val_input, val_gt = dataset.get_testbatch(batch * dataset.bs)
+                val_input, val_gt = dataset.get_testbatch(batch * dataset.test_bs)
 
-                torch.cuda.synchronize()
-                start_time = time.time()
+                if PROFILE_INFERENCE:
+                    torch.cuda.synchronize()
+                    with profile(
+                        activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA],
+                        record_shapes=True,
+                        profile_memory=False
+                    ) as prof:
+                        with record_function("forward_pass"):
+                            output = decoder(val_input)
 
-                output = decoder(val_input)
+                    evt = next(e for e in prof.key_averages() if e.key == "forward_pass")
+                    #print(prof.key_averages().table(sort_by="cuda_time_total", row_limit=10))
+                    #print(prof.key_averages().self_cpu_time_total)
+                    #print(evt.device_time_total)
+                    val_time.append(evt.device_time_total)
+                else:
+                    output = decoder(val_input)
 
-                torch.cuda.synchronize()
-                batch_time.append(time.time() - start_time)
-
-                rgb_pred = brdf_to_rgb(val_input, output)
-                rgb_true = brdf_to_rgb(val_input, val_gt)
+                rgb_pred = brdf_to_rgb_(val_input, output)
+                rgb_true = brdf_to_rgb_(val_input, val_gt)
 
                 loss = mean_absolute_logarithmic_error(y_true=rgb_true, y_pred=rgb_pred)
 
                 val_loss.append(loss.item())
 
-                if batch % 25 == 0:
-                    val_progress.set_description(f"Epoch {epoch}, Batch {batch}, Test loss: {loss.item():.6f}")
-        
-            print(f"Epoch {epoch}, Test loss: {sum(val_loss)/len(val_loss):.6f}, Batch time: {sum(batch_time)/len(batch_time):.6f}")
+            mean_train_loss = sum(train_loss)/len(train_loss)
+
+            if len(val_loss) == 0:
+                mean_val_loss = 0
+            else:
+                mean_val_loss = sum(val_loss)/len(val_loss)
+
+            if len(val_time) == 0:
+                mean_val_time = 0
+            else:
+                mean_val_time = sum(val_time) / len(val_time)
+
+            progress_bar.set_description(f"Epoch {epoch}, Train loss: {mean_train_loss:.6f}, Val loss: {mean_val_loss:.6f}, CUDA time: {mean_val_time / 1000.:.6f}ms")
 
     #decoder.save_raw(DECODER_RAW_PATH)
     print(decoder.decoder)

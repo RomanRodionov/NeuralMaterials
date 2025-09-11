@@ -29,10 +29,14 @@ def brdf_to_rgb(rvectors, brdf):
     return rgb
 
 class MerlDataset(Dataset):
-    def __init__(self, merlPath, batchsize, nsamples=800000, angles=False):
+    def __init__(self, merlPath, batchsize, nsamples=800000, angles=False, train_size=0.8, test_batchsize=None):
         super(MerlDataset, self).__init__()
 
-        self.bs = batchsize
+        self.train_bs = batchsize
+        if test_batchsize is not None:
+            self.test_bs = test_batchsize
+        else:
+            self.test_bs = batchsize
         self.BRDF = fastmerl.Merl(merlPath)
 
         if angles:
@@ -40,8 +44,8 @@ class MerlDataset(Dataset):
         else:
             xvars=Xvars
 
-        self.reflectance_train = generate_nn_datasets(self.BRDF, nsamples=nsamples, pct=0.8, angles=angles)
-        self.reflectance_test = generate_nn_datasets(self.BRDF, nsamples=nsamples, pct=0.2, angles=angles)
+        self.reflectance_train = generate_nn_datasets(self.BRDF, nsamples=nsamples, pct=train_size, angles=angles)
+        self.reflectance_test = generate_nn_datasets(self.BRDF, nsamples=nsamples, pct=(1. - train_size), angles=angles)
 
         self.train_samples = torch.tensor(self.reflectance_train[xvars].values, dtype=torch.float32, device=device)
         self.train_gt = torch.tensor(self.reflectance_train[Yvars].values, dtype=torch.float32, device=device)
@@ -53,10 +57,10 @@ class MerlDataset(Dataset):
         return self.train_samples.shape[0]
 
     def get_trainbatch(self, idx):
-        return self.train_samples[idx:idx + self.bs, :], self.train_gt[idx:idx + self.bs, :]
+        return self.train_samples[idx:idx + self.train_bs, :], self.train_gt[idx:idx + self.train_bs, :]
 
     def get_testbatch(self, idx):
-        return self.test_samples[idx:idx + self.bs, :], self.test_gt[idx:idx + self.bs, :]
+        return self.test_samples[idx:idx + self.test_bs, :], self.test_gt[idx:idx + self.test_bs, :]
 
     def shuffle(self):
         r = torch.randperm(self.train_samples.shape[0])
